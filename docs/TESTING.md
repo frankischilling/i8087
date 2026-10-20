@@ -188,3 +188,16 @@ constant-ROM or stack-fault diagnostic and leave all architectural bytes
 unchanged. Those rejections are counted as blocked. The campaign supplies no
 expected hardware bytes for the five unresolved constant payloads. See
 [the source investigation](research/CONSTANT_LOADS.md).
+
+## F2XM1 signed-zero return
+
+The encoded-instruction regressions add 2,048 canonical signed-zero cases across
+PC/RC fields, TOP, exception masks, sticky flags and empty/full surrounding
+stacks. They check raw storage, tags, control and the absence of a new exception
+or interrupt. Pseudozeros and inconsistent tags retain their guards. The first
+new instruction check fails before the correction and passes afterward.
+
+The smoke capture campaign adds 24 masked signed-zero inputs covering documented
+PC fields and all rounding settings. These are inputs, not hardware outputs.
+[The source investigation](research/F2XM1_ZERO.md) records the precise early
+return and the unverified condition-bit, general-operand and timing behavior.

@@ -24,7 +24,7 @@ exception or electrical behavior. Passing counts must not be presented as an
 | FPREM | Complete finite remainder with original quotient-flag history; precision-control independent | Partial-reduction sequence and tiny-result range processing remain guarded |
 | FSCALE | Zero-tag short circuits, in-range exponent-only scaling, original finite scale domain | Several exceptional/range inputs remain guarded or unverified |
 | FPTAN | Zero and positive normal operands with stored exponent <= 0x3fbf bypass the fallback | Full CORDIC/rational datapath, rounding, two raw outputs and flags remain approximate |
-| Other transcendentals | Explicit opt-in integer-software F2XM1/FYL2X/FYL2XP1/FPATAN fallbacks | Not original microcode; no original-result bit-equivalence claim |
+| Other transcendentals | F2XM1 canonical signed-zero early return; explicit opt-in fallbacks for other inputs | General F2XM1/FYL2X/FYL2XP1/FPATAN algorithms are not original microcode; no original-result bit-equivalence claim |
 | Constants | FLD1 and FLDZ exact; other constant encodings have table entries | Other constants' original ROM bits and loading/rounding behavior remain guarded |
 | Exceptions | Separate sticky flags and event latch; before/after distinction; unmasked PE commits result/store/pop | Unmasked invalid comparison continuation and some special-result paths remain guarded; no asynchronous microinstruction model |
 | Range | Canonical unmasked register exponent wrapping; original exact-tiny UE; suppressed unmasked real stores | Reduced-PC masked underflow, CHOP-overflow disagreement, and malformed/unnormal range paths still need investigation |
@@ -47,7 +47,7 @@ validated on original hardware.
 
 | Flag | Current guard/fallback |
 | --- | --- |
-| `I8087_GAP_TRANSCENDENTAL` | General software transcendental algorithms in place of original microcode; excludes the tiny/zero FPTAN bypass |
+| `I8087_GAP_TRANSCENDENTAL` | General software transcendental algorithms in place of original microcode; excludes canonical signed-zero F2XM1 and the tiny/zero FPTAN bypass |
 | `I8087_GAP_UNNORMAL` | Canonical arithmetic rather than original significance propagation; selected tiny unnormal conversions |
 | `I8087_GAP_RANGE_EXCEPTION` | Remaining range paths, including reduced-PC masked underflow, masked CHOP overflow, and unsupported remainder/range combinations |
 | `I8087_GAP_EXCEPTION_RESTART` | Unmasked invalid comparison continuation and register range cases without a supported wrapped result |

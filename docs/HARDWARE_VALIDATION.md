@@ -42,12 +42,12 @@ Select a campaign with `--suite`:
 
 | Suite | Inputs | Purpose |
 | --- | --- | --- |
-| `smoke` | 388 | Supported arithmetic, remainder and selected raw-state paths |
+| `smoke` | 412 | Supported arithmetic, remainder and selected raw-state paths |
 | `research` | 48 | Deliberately unverified areas |
 | `frndint` | 384 | Raw operand classes and rounding boundaries across PC/RC fields |
 | `overflow` | 96 | Masked arithmetic overflow across signs and control modes; 24 CHOP rows remain guarded |
 | `constants` | 2,688 | All seven loads, documented PC fields, RC, TOP, empty/full stacks and clear/set sticky PE |
-| `all` | 3,604 | Combined campaigns |
+| `all` | 3,628 | Combined campaigns |
 
 The constant campaign preserves known raw bytes in every register and records
 which inputs have occupied stacks. Its model-only check has 384 supported

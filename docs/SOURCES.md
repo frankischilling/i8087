@@ -4,6 +4,10 @@ The implementation was written against original Intel documentation. No source
 from another emulator or floating-point library is included in this package.
 The manuals are not redistributed.
 
+The [F2XM1 signed-zero investigation](research/F2XM1_ZERO.md) combines Intel's
+signed-zero table with the decoded ZERO-tag early return. It supports that
+bounded path without using the general transcendental fallback.
+
 The current [hardware-evidence search](research/HARDWARE_EVIDENCE.md) records
 revision-identification limits, the initial IBM 5150-style target and capture
 leads. A source edition or speed grade does not identify a silicon stepping.

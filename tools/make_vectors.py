@@ -29,6 +29,9 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
                 for op, modrm in (("FADD", 0xC1), ("FSUB", 0xE1), ("FMUL", 0xC9), ("FDIV", 0xF1)):
                     for a in (-9, -1, 1, 9):
                         add(f"{op} {a}/3 pc={pc} rc={rc}", 0xD8, modrm, integer(a), integer(3), cw)
+                for sign in range(2):
+                    add(f"F2XM1 signed zero sign={sign} pc={pc} rc={rc}",
+                        0xD9, 0xF0, (sign << 15, 0), cw=cw)
         for a in range(18):
             for old in range(8):
                 cc = (0x100 if old & 4 else 0) | (0x4000 if old & 2 else 0) | (0x200 if old & 1 else 0)
