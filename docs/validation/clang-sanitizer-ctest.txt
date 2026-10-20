@@ -1,0 +1,63 @@
+Internal ctest changing into directory: /mnt/data/build-v02-sanitize
+UpdateCTestConfiguration  from :/mnt/data/build-v02-sanitize/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/mnt/data/build-v02-sanitize/DartConfiguration.tcl
+Test project /mnt/data/build-v02-sanitize
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: instructions
+
+1: Test command: /mnt/data/build-v02-sanitize/i8087_tests
+1: Working Directory: /mnt/data/build-v02-sanitize
+1: Test timeout computed to be: 120
+1: PASS: 12717 instruction/API assertions (including all 2048 ESC/ModR/M pairs)
+1/6 Test #1: instructions .....................   Passed    0.01 sec
+test 2
+    Start 2: original_8087_regressions
+
+2: Test command: /mnt/data/build-v02-sanitize/i8087_regressions
+2: Working Directory: /mnt/data/build-v02-sanitize
+2: Test timeout computed to be: 120
+2: PASS: 557507 original-8087 regression assertions (document-derived, not hardware captures)
+2/6 Test #2: original_8087_regressions ........   Passed    0.19 sec
+test 3
+    Start 3: raw_state_safety
+
+3: Test command: /mnt/data/build-v02-sanitize/i8087_stress
+3: Working Directory: /mnt/data/build-v02-sanitize
+3: Test timeout computed to be: 120
+3: PASS: 50000 deterministic raw-state cases, 100000 duplicate executions; safety invariants only
+3: outcomes OK=17963 pending=10677 guarded=8689 bad-opcode=11015 memory-fault=1656 bad-argument=0
+3/6 Test #3: raw_state_safety .................   Passed    0.34 sec
+test 4
+    Start 4: rational_oracle
+
+4: Test command: /opt/pyvenv/bin/python3 "/mnt/data/work/i8087/tests/test_fraction.py" "/mnt/data/build-v02-sanitize/i8087_numeric_cli"
+4: Working Directory: /mnt/data/build-v02-sanitize
+4: Test timeout computed to be: 120
+4: PASS: 26048 independent exact-rational arithmetic, sqrt, conversion and rounding cases
+4/6 Test #4: rational_oracle ..................   Passed    1.45 sec
+test 5
+    Start 5: instruction_fraction_oracle
+
+5: Test command: /opt/pyvenv/bin/python3 "/mnt/data/work/i8087/tests/test_instruction_fraction.py" "/mnt/data/build-v02-sanitize/i8087_replay"
+5: Working Directory: /mnt/data/build-v02-sanitize
+5: Test timeout computed to be: 120
+5: PASS: 19000 independent Fraction instruction-level remainder/range cases
+5/6 Test #5: instruction_fraction_oracle ......   Passed    1.92 sec
+test 6
+    Start 6: trace_tool_contracts
+
+6: Test command: /opt/pyvenv/bin/python3 "/mnt/data/work/i8087/tests/test_trace_tools.py" "/mnt/data/build-v02-sanitize/i8087_replay"
+6: Working Directory: /mnt/data/build-v02-sanitize
+6: Test timeout computed to be: 120
+6: PASS: 12 trace-tool scenarios; 388 model-only round trips; no hardware evidence
+6/6 Test #6: trace_tool_contracts .............   Passed    1.80 sec
+
+100% tests passed, 0 tests failed out of 6
+
+Total Test time (real) =   5.72 sec

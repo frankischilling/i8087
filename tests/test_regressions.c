@@ -1,0 +1,255 @@
+/* SPDX-License-Identifier: MIT
+ * Original-8087 instruction regression tests. These expected values are
+ * document/algorithm-derived, NOT captures from original hardware. */
+#include "i8087.h"
+#include "soft80.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define JBIT UINT64_C(0x8000000000000000)
+#define CC (I8087_C0|I8087_C1|I8087_C2|I8087_C3)
+static unsigned long checks;
+#define CHECK(x) do {++checks;if(!(x)){fprintf(stderr,"%s:%d: %s\n",__FILE__,__LINE__,#x);exit(1);}}while(0)
+static uint8_t memory[256];
+static bool fail_write;
+static unsigned writes;
+static bool rd(void *ctx,uint32_t a,uint8_t *p,size_t n) {
+    (void)ctx;if(a>sizeof(memory)||n>sizeof(memory)-a)return false;
+    memcpy(p,memory+a,n);return true;
+}
+static bool wr(void *ctx,uint32_t a,const uint8_t *p,size_t n) {
+    (void)ctx;if(fail_write||a>sizeof(memory)||n>sizeof(memory)-a)return false;
+    memcpy(memory+a,p,n);++writes;return true;
+}
+static const i8087_bus bus={NULL,rd,wr};
+static bool eq(i8087_f80 a,i8087_f80 b) {return a.significand==b.significand&&a.sign_exponent==b.sign_exponent;}
+static void slot(i8087 *f,unsigned i,i8087_f80 x,unsigned tag) {
+    unsigned p=(i8087_top(f)+i)&7;
+    f->registers[p]=x;
+    f->tags=(uint16_t)((f->tags&~(3u<<(2*p)))|(tag<<(2*p)));
+}
+static void number(i8087 *f,unsigned i,i8087_f80 x) {slot(f,i,x,sf_tag(x));}
+static i8087_f80 st(i8087 *f,unsigned i) {
+    i8087_f80 x;CHECK(i8087_get_st(f,i,&x));return x;
+}
+static i8087_result op(i8087 *f,uint8_t esc,uint8_t m) {return i8087_execute(f,&bus,esc,m,0x12345,0);}
+static void ok(i8087 *f,uint8_t esc,uint8_t m) {CHECK(op(f,esc,m)==I8087_OK);CHECK(f->last_gap==0);}
+static i8087_f80 integer(int n) {return sf_from_u64((uint64_t)(n<0?-n:n),n<0);}
+static uint16_t cc_from_q(unsigned q) {
+    return (uint16_t)(((q&4)?I8087_C0:0)|((q&2)?I8087_C3:0)|((q&1)?I8087_C1:0));
+}
+static bool same_registers(const i8087 *a,const i8087 *b) {
+    unsigned i;if(a->tags!=b->tags||i8087_top(a)!=i8087_top(b))return false;
+    for(i=0;i<8;++i)if(!eq(a->registers[i],b->registers[i]))return false;
+    return true;
+}
+static void extract_fields(void) {
+    const uint16_t exponents[]={0,1,17,0x3ffe,0x3fff,0x4000,0x7ffe};
+    const uint64_t fractions[]={0,1,UINT64_C(0x123456789abcdef),JBIT,JBIT+1,UINT64_MAX};
+    unsigned e,v,sign,pc,rc;
+    for(e=0;e<sizeof(exponents)/sizeof(exponents[0]);++e)
+    for(v=0;v<sizeof(fractions)/sizeof(fractions[0]);++v)
+    for(sign=0;sign<2;++sign)for(pc=0;pc<4;++pc)for(rc=0;rc<4;++rc) {
+        i8087 f;i8087_f80 input={fractions[v],(uint16_t)(exponents[e]|(sign<<15))};
+        i8087_f80 expected_exp=integer((int)exponents[e]-16383),expected_sig=input;
+        i8087_init(&f);number(&f,0,input);f.control=(uint16_t)(0x00bf|(pc<<8)|(rc<<10));
+        if(!fractions[v]&&!exponents[e])expected_exp=expected_sig=input;
+        else expected_sig.sign_exponent=(uint16_t)(0x3fff|(sign<<15));
+        ok(&f,0xd9,0xf4);
+        CHECK(eq(st(&f,0),expected_sig));CHECK(eq(st(&f,1),expected_exp));
+        CHECK(!(f.status&0x3f));CHECK(i8087_top(&f)==7);
+    }
+}
+static void remainder_flags(void) {
+    unsigned a,b,sign,old,rc,pc;
+    for(a=0;a<=257;++a)for(b=1;b<=11;++b)
+    for(sign=0;sign<4;++sign)for(old=0;old<8;++old) {
+        i8087 f;
+        unsigned quotient=a/b,width=quotient<2?1:(quotient<4?2:3);
+        unsigned expected=width<3?((old<<width)|quotient)&7:quotient&7;
+        i8087_init(&f);
+        number(&f,0,sf_from_u64(a,(sign&1)!=0));
+        number(&f,1,sf_from_u64(b,(sign&2)!=0));
+        f.status|=(uint16_t)(cc_from_q(old)|I8087_C2);
+        ok(&f,0xd9,0xf8);
+        CHECK(eq(st(&f,0),sf_from_u64(a%b,(sign&1)!=0)));
+        CHECK((f.status&CC)==cc_from_q(expected));CHECK(!(f.status&0x3f));
+    }
+    for(pc=0;pc<4;++pc)for(rc=0;rc<4;++rc) {
+        i8087 f;i8087_init(&f);f.control=(uint16_t)(0x00bf|(pc<<8)|(rc<<10));
+        number(&f,0,(i8087_f80){JBIT+123,0x403e});number(&f,1,integer(1));
+        ok(&f,0xd9,0xf8);CHECK(eq(st(&f,0),integer(0)));CHECK(!(f.status&I8087_PE));
+        CHECK((f.status&CC)==cc_from_q(3));
+    }
+    {i8087 f;i8087_init(&f);number(&f,0,integer(7));number(&f,1,integer(0));f.status|=I8087_C2;
+     ok(&f,0xd9,0xf8);CHECK(f.status&I8087_IE);CHECK(!(f.status&I8087_C2));}
+    {i8087 f;i8087_init(&f);number(&f,0,(i8087_f80){JBIT,0x4100});number(&f,1,integer(3));
+     CHECK(op(&f,0xd9,0xf8)==I8087_UNVERIFIED);CHECK(f.last_gap&I8087_GAP_PARTIAL_REMAINDER);}
+    {i8087 f;i8087_init(&f);number(&f,0,(i8087_f80){UINT64_C(0x1000000000000000),0x4004});
+     number(&f,1,integer(3));ok(&f,0xd9,0xf8);CHECK(eq(st(&f,0),integer(1)));}
+}
+static void scale_early_exit_and_fields(void) {
+    unsigned sign,which,tag;
+    const i8087_f80 special={UINT64_C(0xc123456789abcdef),0x7fff};
+    for(sign=0;sign<2;++sign)for(which=0;which<2;++which)for(tag=0;tag<4;++tag) {
+        i8087 f,before;i8087_init(&f);f.control&=(uint16_t)~0x3f;
+        number(&f,which,(i8087_f80){0,(uint16_t)(sign<<15)});
+        slot(&f,which^1,special,tag);before=f;
+        ok(&f,0xd9,0xfd);CHECK(same_registers(&f,&before));CHECK(!(f.status&0x3f));
+    }
+    for(sign=0;sign<2;++sign) {
+        int delta;for(delta=-31;delta<=31;++delta) {
+            i8087 f;i8087_f80 raw={UINT64_C(0x123456789abcdef),(uint16_t)(0x4000|(sign<<15))};
+            i8087_f80 expected=raw;i8087_init(&f);number(&f,0,raw);number(&f,1,integer(delta));
+            expected.sign_exponent=(uint16_t)((unsigned)(0x4000+delta)|(sign<<15));
+            ok(&f,0xd9,0xfd);CHECK(eq(st(&f,0),expected));CHECK(i8087_tag(&f,0)==I8087_TAG_VALID);
+        }
+    }
+    {i8087 f,before;i8087_init(&f);number(&f,0,integer(5));number(&f,1,(i8087_f80){JBIT,0x3ffe});
+     before=f;CHECK(op(&f,0xd9,0xfd)==I8087_UNVERIFIED);CHECK(same_registers(&f,&before));
+     CHECK(f.last_gap&I8087_GAP_UNDEFINED_OPERAND);}
+    {i8087 f;i8087_init(&f);number(&f,0,(i8087_f80){1,0});number(&f,1,integer(3));
+     ok(&f,0xd9,0xfd);CHECK(eq(st(&f,0),(i8087_f80){1,4}));CHECK(f.status&I8087_DE);}
+}
+static void tangent_tiny(void) {
+    const uint16_t exponents[]={1,17,0x3f00,0x3fbe,0x3fbf};
+    unsigned e,pc,rc,sign;
+    for(e=0;e<sizeof(exponents)/sizeof(exponents[0]);++e)
+    for(pc=0;pc<4;++pc)for(rc=0;rc<4;++rc) {
+        i8087 f;i8087_f80 a={JBIT+12345,exponents[e]};i8087_init(&f);
+        f.control=(uint16_t)(0x00bf|(pc<<8)|(rc<<10));number(&f,0,a);
+        ok(&f,0xd9,0xf2);CHECK(eq(st(&f,0),integer(1)));CHECK(eq(st(&f,1),a));
+        CHECK((f.status&0x3f)==I8087_PE);CHECK(!f.used_approximations);
+    }
+    for(sign=0;sign<2;++sign) {
+        i8087 f;i8087_f80 z={0,(uint16_t)(sign<<15)};i8087_init(&f);number(&f,0,z);
+        ok(&f,0xd9,0xf2);CHECK(eq(st(&f,0),integer(1)));CHECK(eq(st(&f,1),z));CHECK(!(f.status&0x3f));
+    }
+    {i8087 f;i8087_init(&f);number(&f,0,(i8087_f80){JBIT,0x3fc0});
+     CHECK(op(&f,0xd9,0xf2)==I8087_UNVERIFIED);CHECK(f.last_gap&I8087_GAP_TRANSCENDENTAL);}
+    {i8087 f;i8087_init(&f);number(&f,0,(i8087_f80){JBIT,0x3fbf});f.control&=(uint16_t)~I8087_PE;
+     CHECK(op(&f,0xd9,0xf2)==I8087_PENDING_INTERRUPT);CHECK(i8087_top(&f)==7);
+     CHECK(eq(st(&f,0),integer(1)));CHECK((f.status&(I8087_PE|I8087_IR))==(I8087_PE|I8087_IR));}
+}
+static void pseudozeros_and_tags(void) {
+    i8087 f;unsigned tag,sign;
+    for(sign=0;sign<2;++sign) {
+        i8087_f80 raw={0,(uint16_t)(0x4000|(sign<<15))};
+        i8087_init(&f);number(&f,0,raw);CHECK(i8087_tag(&f,0)==I8087_TAG_VALID);
+        ok(&f,0xd9,0xe5);CHECK((f.status&CC)==(sign?I8087_C1:0));
+        number(&f,1,raw);number(&f,0,integer(1));ok(&f,0xd8,0xf1);
+        CHECK(f.status&I8087_IE);CHECK(!(f.status&I8087_ZE));
+        i8087_init(&f);number(&f,0,raw);ok(&f,0xd9,0xfc);CHECK(eq(st(&f,0),sf_zero(sign!=0)));
+    }
+    /* Register transfers copy tags rather than reclassifying the data bytes.
+       These deliberately mismatched tag images exercise FRSTOR-style input. */
+    for(tag=0;tag<3;++tag) {
+        i8087_f80 raw={UINT64_C(0x123456789abcdef0),0x4321};
+        i8087_init(&f);slot(&f,0,raw,tag);number(&f,1,integer(3));
+        ok(&f,0xd9,0xc0);CHECK(i8087_tag(&f,0)==tag);CHECK(eq(st(&f,0),raw));
+        ok(&f,0xd9,0xca);CHECK(i8087_tag(&f,2)==tag);CHECK(eq(st(&f,2),raw));
+        ok(&f,0xd9,0xca);ok(&f,0xdd,0xd3);CHECK(i8087_tag(&f,3)==tag);CHECK(eq(st(&f,3),raw));
+        ok(&f,0xd9,0xe0);CHECK(i8087_tag(&f,0)==tag);
+        ok(&f,0xd9,0xe1);CHECK(i8087_tag(&f,0)==tag);
+    }
+}
+static void exceptions_and_interrupt_latch(void) {
+    i8087 f,before;unsigned count;
+    /* A precision trap happens AFTER rounding and AFTER any store/pop. */
+    i8087_init(&f);number(&f,0,integer(1));number(&f,1,integer(3));f.control&=(uint16_t)~I8087_PE;
+    CHECK(op(&f,0xd8,0xf1)==I8087_PENDING_INTERRUPT);CHECK(!f.last_gap);
+    CHECK(eq(st(&f,0),(i8087_f80){UINT64_C(0xaaaaaaaaaaaaaaab),0x3ffd}));
+    CHECK((f.status&(I8087_PE|I8087_IR|I8087_BUSY))==(I8087_PE|I8087_IR|I8087_BUSY));
+    CHECK(!i8087_interrupt_asserted(&f));
+    /* Without WAIT, another ESC may run with a pending masked-global IRQ. */
+    ok(&f,0xd9,0xe8);CHECK(eq(st(&f,0),integer(1)));CHECK(f.status&I8087_IR);
+    CHECK(i8087_wait(&f)==I8087_PENDING_INTERRUPT);CHECK(i8087_interrupt_asserted(&f));
+    before=f;CHECK(op(&f,0xd9,0xe8)==I8087_PENDING_INTERRUPT);CHECK(same_registers(&f,&before));
+    ok(&f,0xdb,0xe2);CHECK(!(f.status&(I8087_IR|I8087_BUSY|0x3f)));
+    i8087_init(&f);number(&f,0,(i8087_f80){UINT64_C(0xc000000000000000),0x3fff});
+    f.control&=(uint16_t)~I8087_PE;memory[0]=99;count=writes;
+    CHECK(op(&f,0xdf,0x1e)==I8087_PENDING_INTERRUPT);CHECK(writes==count+1);
+    CHECK(memory[0]==2&&memory[1]==0);CHECK(i8087_top(&f)==1);CHECK(f.tags==0xffff);
+    i8087_init(&f);number(&f,0,(i8087_f80){JBIT+1,0x3fff});f.control&=(uint16_t)~I8087_PE;
+    CHECK(op(&f,0xd9,0x1e)==I8087_PENDING_INTERRUPT);CHECK(memory[3]==0x3f&&memory[2]==0x80);
+    CHECK(i8087_top(&f)==1);CHECK(!f.last_gap);
+    /* Callback failure must also roll back the newly latched after exception. */
+    i8087_init(&f);number(&f,0,(i8087_f80){JBIT+1,0x3fff});f.control&=(uint16_t)~I8087_PE;
+    before=f;fail_write=true;CHECK(op(&f,0xd9,0x1e)==I8087_MEMORY_FAULT);fail_write=false;
+    CHECK(same_registers(&f,&before));CHECK(f.status==before.status);
+    /* Unmasking an old sticky exception does NOT synthesize a new event. */
+    i8087_init(&f);f.status=I8087_PE;memory[0]=0x9f;memory[1]=3;
+    ok(&f,0xd9,0x2e);CHECK(!(f.status&(I8087_IR|I8087_BUSY)));CHECK(f.status&I8087_PE);
+    number(&f,0,integer(1));ok(&f,0xd8,0xc0);CHECK(!(f.status&I8087_IR));
+    /* Masking a latched exception does not erase it either. */
+    f.status|=I8087_IR|I8087_BUSY;memory[0]=0xbf;memory[1]=3;
+    ok(&f,0xd9,0x2e);CHECK((f.status&(I8087_IR|I8087_BUSY))==(I8087_IR|I8087_BUSY));
+    ok(&f,0xd9,0x36);CHECK(f.status&I8087_IR);ok(&f,0xdb,0xe2);CHECK(!(f.status&I8087_IR));
+    /* Before exceptions leave both operands and the stack unchanged. */
+    i8087_init(&f);number(&f,0,integer(1));number(&f,1,integer(0));f.control&=(uint16_t)~I8087_ZE;
+    before=f;CHECK(op(&f,0xd8,0xf1)==I8087_PENDING_INTERRUPT);CHECK(same_registers(&f,&before));CHECK(!f.last_gap);
+    i8087_init(&f);number(&f,0,integer(0));number(&f,1,integer(0));f.control&=(uint16_t)~I8087_IE;
+    before=f;CHECK(op(&f,0xde,0xf9)==I8087_PENDING_INTERRUPT);CHECK(same_registers(&f,&before));CHECK(!f.last_gap);
+    i8087_init(&f);f.control&=(uint16_t)~I8087_DE;memset(memory,0,4);memory[0]=1;
+    before=f;CHECK(op(&f,0xd9,0x06)==I8087_PENDING_INTERRUPT);CHECK(same_registers(&f,&before));
+    CHECK((f.status&0x3f)==I8087_DE);
+}
+static void range_destinations_and_nan_signs(void) {
+    i8087 f,before;unsigned sign,rc,operation;
+    for(sign=0;sign<2;++sign)for(rc=0;rc<4;++rc) {
+        i8087_f80 tiny={JBIT,(uint16_t)(1|(sign<<15))};
+        i8087_f80 huge={JBIT,(uint16_t)(0x7ffe|(sign<<15))};
+        i8087_init(&f);f.control=(uint16_t)((0x3bf|(rc<<10))&~(unsigned)I8087_UE);
+        number(&f,0,tiny);number(&f,1,(i8087_f80){JBIT,0x3ffe});
+        CHECK(op(&f,0xd8,0xc9)==I8087_PENDING_INTERRUPT);CHECK(!f.last_gap);
+        CHECK(eq(st(&f,0),(i8087_f80){JBIT,(uint16_t)(0x6000|(sign<<15))}));
+        CHECK((f.status&0x3f)==I8087_UE);
+        i8087_init(&f);f.control=(uint16_t)((0x3bf|(rc<<10))&~(unsigned)I8087_OE);
+        number(&f,0,huge);number(&f,1,integer(2));
+        CHECK(op(&f,0xd8,0xc9)==I8087_PENDING_INTERRUPT);CHECK(!f.last_gap);
+        CHECK(eq(st(&f,0),(i8087_f80){JBIT,(uint16_t)(0x1fff|(sign<<15))}));
+        CHECK((f.status&0x3f)==I8087_OE);
+        /* Masked exact underflow preserves a subnormal and reports UE alone. */
+        i8087_init(&f);f.control=(uint16_t)(0x3bf|(rc<<10));
+        number(&f,0,tiny);number(&f,1,(i8087_f80){JBIT,0x3ffe});
+        ok(&f,0xd8,0xc9);
+        CHECK(eq(st(&f,0),(i8087_f80){JBIT>>1,(uint16_t)(sign<<15)}));
+        CHECK((f.status&0x3f)==I8087_UE);
+        /* Exact minimum float subnormal: store reports UE without PE. */
+        i8087_init(&f);number(&f,0,(i8087_f80){JBIT,(uint16_t)((16383-149)|(sign<<15))});
+        ok(&f,0xd9,0x1e);CHECK(memory[0]==1&&memory[1]==0&&memory[2]==0&&memory[3]==sign*128);
+        CHECK((f.status&0x3f)==I8087_UE);CHECK(i8087_top(&f)==1);
+        /* Unmasked range conversion: NO write, NO pop, NO precision stage. */
+        i8087_init(&f);f.control&=(uint16_t)~(I8087_UE|I8087_PE);
+        number(&f,0,(i8087_f80){JBIT+1,(uint16_t)((16383-150)|(sign<<15))});
+        before=f;memset(memory,0x5a,8);
+        CHECK(op(&f,0xd9,0x1e)==I8087_PENDING_INTERRUPT);CHECK(same_registers(&f,&before));
+        CHECK(memory[0]==0x5a&&memory[3]==0x5a);CHECK((f.status&0x3f)==I8087_UE);CHECK(!f.last_gap);
+    }
+    /* A NaN selected by subtraction must not acquire an artificial minus sign. */
+    for(operation=0;operation<8;++operation) {
+        const i8087_f80 nan={UINT64_C(0xc123456789abcdef),0xffff};
+        if(operation==2||operation==3)continue;
+        i8087_init(&f);number(&f,0,integer(5));number(&f,1,nan);
+        ok(&f,0xd8,(uint8_t)(0xc1|(operation<<3)));
+        CHECK(eq(st(&f,0),nan));CHECK((f.status&0x3f)==I8087_IE);
+    }
+    /* DE must preempt a would-be unnormal arithmetic/range computation. */
+    i8087_init(&f);f.control&=(uint16_t)~I8087_DE;number(&f,0,integer(1));
+    number(&f,1,(i8087_f80){1,0});before=f;
+    CHECK(op(&f,0xd8,0xc1)==I8087_PENDING_INTERRUPT);CHECK(!f.last_gap);
+    CHECK(same_registers(&f,&before));CHECK((f.status&0x3f)==I8087_DE);
+    i8087_init(&f);number(&f,0,(i8087_f80){JBIT>>1,0x4000});number(&f,1,integer(1));
+    ok(&f,0xd8,0xd1);CHECK((f.status&0x3f)==I8087_DE);CHECK(f.status&I8087_C3);
+    i8087_init(&f);number(&f,0,(i8087_f80){JBIT>>1,0x4000});number(&f,1,integer(1));
+    f.control&=(uint16_t)~I8087_DE;f.status|=I8087_C0|I8087_C1;before=f;
+    CHECK(op(&f,0xd8,0xd9)==I8087_PENDING_INTERRUPT);CHECK(!f.last_gap);
+    CHECK(same_registers(&f,&before));CHECK((f.status&CC)==(before.status&CC));
+}
+int main(void) {
+    extract_fields();remainder_flags();scale_early_exit_and_fields();tangent_tiny();
+    pseudozeros_and_tags();exceptions_and_interrupt_latch();range_destinations_and_nan_signs();
+    printf("PASS: %lu original-8087 regression assertions (document-derived, not hardware captures)\n",checks);
+    return 0;
+}

@@ -1,0 +1,108 @@
+# Validation report — 0.2.0
+
+Run on 2026-10-20 in a Linux x86_64 container. These are software tests, not
+original-8087 hardware measurements.
+
+## Build configurations actually exercised
+
+| Configuration | Result |
+| --- | --- |
+| GCC 14.2.0, C11, CMake Release, warnings as errors | All six CTest suites passed |
+| Clang 17.0.0, C11, Debug, AddressSanitizer + UndefinedBehaviorSanitizer, warnings as errors | All six suites passed; no sanitizer errors observed |
+| GNU binutils 2.44, 8086-mode DOS probe assembly | CAPTURE.COM assembled to 1,196 bytes; not executed under DOS or on hardware |
+| Clang static analyzer on library and replay sources | No diagnostics emitted; not a proof of correctness |
+| Tests-disabled CMake build | Library, replay and demo built with GCC warnings as errors |
+| Standalone C demo | `(2 + 3) * 4 = 20`; control 03bf, status 0000, tags ffff |
+
+Compiler warnings: `-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror`.
+CMake 3.31.6; Python 3.13.5. The new tooling uses Python 3.10+ syntax; that lower
+version itself was not tested. Windows/MSVC and non-x86 hosts were not tested.
+
+## Actual test output
+
+```text
+PASS: 12717 instruction/API assertions (including all 2048 ESC/ModR/M pairs)
+PASS: 557507 original-8087 regression assertions (document-derived, not hardware captures)
+PASS: 50000 deterministic raw-state cases, 100000 duplicate executions; safety invariants only
+PASS: 26048 independent exact-rational arithmetic, sqrt, conversion and rounding cases
+PASS: 19000 independent Fraction instruction-level remainder/range cases
+PASS: 12 trace-tool scenarios; 388 model-only round trips; no hardware evidence
+100% tests passed, 0 tests failed out of 6
+```
+
+Do not add these numbers together and call the sum hardware test vectors.
+Assertions can inspect multiple aspects of one case, safety checks are not a
+numerical oracle, and model-only round trips are not independent hardware tests.
+
+## What the suites check
+
+**Instruction/API tests.** Operand order, memory/register forms, pops, tags,
+stack wrap, environment transfers, initialization, BCD and integer conversions,
+original infinity behavior, controls, callback failure and known-gap guards.
+The all-encoding traversal is a decoder/safety smoke test, not an independent
+proof of each encoding's original behavior. Two previous guard assumptions were
+replaced by new supported-path assertions, so this count is slightly lower than
+0.1.0; substantially more checks are in the new regression suite.
+
+**Original-specific regressions.** Raw/signed-zero FXTRACT across control modes;
+FPREM quotient history and sign combinations; zero-tag FSCALE, raw unnormal
+exponent adjustment; tiny FPTAN; copied tags and pseudozeros; before/after
+exceptions; pending-event/mask/WAIT behavior; exponent wrapping and conversion
+range exceptions; NaN sign selection and rollback. The large assertion count is
+mainly enumeration of integer FPREM cases and their previous condition bits.
+The expectations come from documentation/analysis, not physical captures.
+
+As a regression check, the new C regression executable was also linked against
+the original 0.1.0 library. It failed its first signed-zero FXTRACT check, while
+the revised library passed. This demonstrates detection of a real change in
+behavior, not that all revised behavior is silicon-verified.
+
+**Raw-state safety.** Seed `0x8087198020260200`; 50,000 generated states, each
+executed twice on isolated instances/memories. Checks repeatability, rollback,
+callback failure, bounded transfers and state-field invariants across normal,
+special, malformed and inconsistent tag/value inputs. Not an accuracy oracle.
+Observed first-execution outcomes: 17,963 OK; 10,677 pending; 8,689 guarded;
+11,015 bad opcode; 1,656 memory fault; zero bad arguments.
+
+**Numerical backend oracle.** Python Fraction and integer square root, not host
+floating point. Seed `0x80871980`; 14,000 arithmetic/square-root cases, 12,000
+conversion/integer-rounding cases and 48 directed ties. Checks canonical results,
+flags and rounding direction. This backend oracle does not encode every original
+8087 exception policy; the instruction layer adds those policies.
+
+**Instruction-level Fraction oracle.** Seed `0x80872026`; 6,500 fractional FPREM
+cases, 10,000 arithmetic cases around register range boundaries and 2,500
+masked underflow/borderline cases. All execute actual encoded instructions via
+C replay. Expected results come from independent rational arithmetic and
+unbounded rounding, with the documented range-exponent adjustment. This checks
+the implementation of the stated model, not the validity of every silicon
+assumption behind that model.
+
+**Trace protocol.** Malformed/truncated/trailing inputs, count limits, opcode
+rejection, MODEL-vs-HARDWARE markers, explicit self-test handling and retention
+of research-gap rows. The 388 round trips compare model output with itself and
+are deliberately labeled as such. The DOS collector's real runtime behavior is
+not covered by these host-tool tests.
+
+## Reproduce
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-Werror
+cmake --build build
+ctest --test-dir build -V
+
+cmake -S . -B build-sanitize -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_BUILD_TYPE=Debug -DI8087_SANITIZE=ON -DCMAKE_C_FLAGS=-Werror
+cmake --build build-sanitize
+ctest --test-dir build-sanitize -V
+
+sh tools/hardware/build.sh
+```
+
+## Not established
+
+No complete 1:1 equivalence, full original transcendental outputs, arbitrary
+unnormal arithmetic, constant-ROM loading, all exceptional/undefined raw results,
+original-hardware behavior, DOS collector runtime, Windows/ARM portability,
+cycle timing or electrical-interface behavior has been established. See
+ACCURACY.md and HARDWARE_VALIDATION.md for remaining work and capture scope.
