@@ -106,3 +106,20 @@ unnormal arithmetic, constant-ROM loading, all exceptional/undefined raw results
 original-hardware behavior, DOS collector runtime, Windows/ARM portability,
 cycle timing or electrical-interface behavior has been established. See
 ACCURACY.md and HARDWARE_VALIDATION.md for remaining work and capture scope.
+
+## Hosted and Windows checks after import
+
+[PR #2](https://github.com/frankischilling/i8087/pull/2) adds CI and fixes MSVC
+build diagnostics. All four jobs passed on its final head, commit
+`750656885b9bb08bae351c98efd49633649bbd42`:
+[Actions run 39509538139](https://github.com/frankischilling/i8087/actions/runs/39509538139).
+The jobs cover all six suites with GCC/Linux, Clang/Linux with ASan/UBSan, and
+MSVC/Windows, plus a tests-disabled build, demo and reproducible DOS collector
+assembly. Logs are retained as run artifacts.
+
+Local Windows runs also passed all six suites with MinGW GCC 15.2.0 and MSVC
+19.51.36260.0, using Python 3.14. CMake was 4.2.3. Warnings were errors; the
+replay and numerical test tools use a target-local Microsoft CRT setting to
+retain ISO C stdio. No original-hardware execution or non-x86 portability was
+established by these runs. The preceding 0.2.0 results remain historical records
+of the imported package.

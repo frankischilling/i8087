@@ -4,6 +4,10 @@ The implementation was written against original Intel documentation. No source
 from another emulator or floating-point library is included in this package.
 The manuals are not redistributed.
 
+The current [hardware-evidence search](research/HARDWARE_EVIDENCE.md) records
+revision-identification limits, the initial IBM 5150-style target and capture
+leads. A source edition or speed grade does not identify a silicon stepping.
+
 ## Intel 8087 datasheet, order 205835-007
 
 Intel, *8087 Numeric Data Processor*, archived PDF:
