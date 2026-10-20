@@ -55,6 +55,12 @@ The archive text is OCR and is not itself a golden executable specification.
 The code's unverified behavior and missing hardware validation are recorded in
 ACCURACY.md, not inferred away from ambiguous text.
 
+The [directed-overflow investigation](research/DIRECTED_OVERFLOW.md) uses
+visually inspected S-75, S-78, S-80 and S-81 pages. S-75 explicitly specifies
+the original PE/OE policy. The finite-bound interpretation also uses the
+recovered precision-adjustment and saturation ordering; a conflicting printed
+significand footnote is retained in the research record.
+
 ## Original instruction and exception details used in 0.2.0
 
 The 1981 manual's FXTRACT description explicitly discusses signed-zero results

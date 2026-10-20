@@ -42,8 +42,10 @@ The smoke suite has 388 input cases; the research suite has 48. `--suite researc
 selects deliberately unverified areas. `--suite frndint` supplies 384 masked
 FRNDINT inputs covering raw unnormals, denormals, pseudozeros, signed zeros and
 integral/fractional boundaries across control modes. `--suite all` combines the
-three suites. Input generation alone establishes nothing about the chip or the
-emulator's accuracy.
+four suites. `--suite overflow` adds 96 masked arithmetic overflow inputs across
+signs, PC and RC. Its 24 CHOP cases remain guarded in the model; a blocked row
+is not a passing comparison. Input generation alone establishes nothing about
+the chip or the emulator's accuracy.
 
 `tools/hardware/CAPTURE.COM` is supplied together with its assembly source. The
 build script can reproduce it using GNU `as` and `ld` with 32-bit ELF support;

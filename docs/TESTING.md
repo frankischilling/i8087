@@ -155,3 +155,21 @@ generation and model replay are tooling checks; no hardware output is supplied.
 As a sensitivity check, a temporary copy of the backend was changed to bypass
 normalization based on the stored exponent. The new encoding check failed;
 the unchanged core passed. The temporary mutation is not part of the library.
+
+## Masked directed overflow
+
+The source-derived instruction tests cover full-width register saturation,
+directed PE/OE policy, sticky flags, unmasked PE continuation, register/pop
+forms and arithmetic memory operands. Short/long real stores separately check
+their widths, committed stores/pops and unmasked overflow suppression. Nearest
+rounding remains a control case. The new register encoding check fails against
+the core before the correction and passes afterward.
+
+The instruction-level Fraction oracle adds 2,000 seeded directed-overflow
+cases to its previous 19,000, calculating exact results and then applying the
+stated original policy. It also checks result tags. The capture generator adds
+96 masked overflow inputs; its tooling check retains 24 unresolved CHOP rows as
+blocked. All of these expectations are document/die-derived or model-only.
+They do not establish agreement with a physical 8087. See
+[the investigation](research/DIRECTED_OVERFLOW.md) for the source discrepancy
+and limits of the decoded-path inference.

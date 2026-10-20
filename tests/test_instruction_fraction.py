@@ -99,6 +99,30 @@ def main():
             flags |= UE
         inputs.append(vector(0xD8, 0xC9, a, b, 0x3BF | rc << 10))
         expectations.append((0, (e, sig), flags, None, "masked register underflow"))
+    # Intel S-75: directed masked overflow raises PE without adding sticky OE.
+    # The finite register bound is constructed after PC rounding at full width.
+    for _ in range(2000):
+        op = rng.choice(tuple(operations))
+        p, pc = rng.choice(((24, 0), (53, 2), (64, 3)))
+        rc, sign = rng.choice((1, 2)), rng.randrange(2)
+        a = (0x7FFE | sign << 15, J | rng.getrandbits(63))
+        be = 0x4000 if op == "mul" else 0x3FFD if op == "div" else 0x7FFE
+        bsign = (sign ^ (op == "sub")) if op in ("add", "sub") else 0
+        b = (be | bsign << 15, J | rng.getrandbits(63))
+        av, bv = value(a), value(b)
+        x = {"add": lambda: av + bv, "sub": lambda: av - bv,
+             "mul": lambda: av * bv, "div": lambda: av / bv}[op]()
+        _, _, exponent, _, _ = unbounded_round(x, p, rc)
+        assert exponent > 16383 and (x < 0) == bool(sign)
+        finite = (sign and rc == 2) or (not sign and rc == 1)
+        expected = ((sign << 15) | (0x7FFE if finite else 0x7FFF), 2 * J - 1 if finite else J)
+        sticky = OE if rng.randrange(2) else 0
+        cw = 0xBF | pc << 8 | rc << 10
+        if rng.randrange(2):
+            cw &= ~PE
+        inputs.append(vector(0xD8, operations[op], a, b, cw, sticky))
+        expectations.append((1 if not cw & PE else 0, expected, PE | sticky, None,
+                             f"masked directed overflow {op} p={p} rc={rc}"))
     with tempfile.TemporaryDirectory() as directory:
         src, dst = Path(directory) / "vectors.bin", Path(directory) / "model.bin"
         write_trace(src, INPUT_MAGIC, inputs)
@@ -114,6 +138,10 @@ def main():
                                      f"want {expect}")
             assert sw & 0x3800 == 0, index
             assert bool(sw & 0x80) == (result == 1), index
+            e, sig = want_value
+            exponent = e & 0x7FFF
+            tag = 2 if exponent == 0x7FFF or (exponent == 0 and sig) else 1 if not sig else 0
+            assert tags & 3 == tag, (index, label, tags, tag)
             if cc is not None:
                 assert sw & 0x4700 == cc, (index, label, sw, cc)
     print(f"PASS: {len(inputs)} independent Fraction instruction-level remainder/range cases")

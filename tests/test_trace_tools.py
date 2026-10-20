@@ -121,6 +121,16 @@ def main():
         report = compare(read_trace(rounding_src), rounding_out, rounding_out, True)
         assert report["matched"] == 384 and not report["blocked"] and not report["approximated"]
         tests += 1
+        overflow, labels = make_cases("overflow")
+        assert len(overflow) == len(labels) == 96
+        overflow_src, overflow_dst = directory / "overflow-input.bin", directory / "overflow-model.bin"
+        write_trace(overflow_src, INPUT_MAGIC, overflow)
+        subprocess.run([replay, str(overflow_src), str(overflow_dst)], check=True, capture_output=True)
+        rows = read_trace(overflow_dst).records
+        # CHOP remains unresolved; generation must not hide its guarded results.
+        assert sum(int.from_bytes(row[:2], "little") == 2 for row in rows) == 24
+        assert sum(int.from_bytes(row[:2], "little") == 0 for row in rows) == 72
+        tests += 1
     print(f"PASS: {tests} trace-tool scenarios; {len(records)} smoke and {len(rounding)} FRNDINT model-only round trips; no hardware evidence")
 
 if __name__ == "__main__":

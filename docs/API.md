@@ -104,6 +104,13 @@ require approximate mode; see ACCURACY.md. Existing sticky flags do not become
 new events just because FLDCW changes masks. Masking a pending event does not
 clear the latched IR. FCLEX/FINIT are explicit clearing operations.
 
+For masked overflow with RC=down/up, the instruction layer follows the original
+Intel S-75 rule: raise PE without newly setting OE. An earlier sticky OE remains
+set. If PE is unmasked, the rounded register result or completed memory store
+and pop are retained. The finite saturation bound for a normal register result
+uses all 64 significand bits after PC adjustment; short/long real stores retain
+their own widths. See [the source evidence](research/DIRECTED_OVERFLOW.md).
+
 The host should synchronize at WAIT before dispatching the following CPU
 instruction. It must distinguish that blocked synchronization point from an
 already-dispatched ESC that reported a new exception; blindly retrying an

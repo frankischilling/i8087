@@ -82,6 +82,12 @@ all boundary cases. Default strict mode must not be called a 1:1 mode.
   those two raw register values are not the original partial-tangent outputs.
 - Interrupt/WAIT behavior is instruction-atomic and functional. It does not
   reproduce internal microinstruction interrupt timing or pin waveforms.
+- Masked directed overflow follows Intel S-75: raise PE without newly setting
+  OE, preserving an old sticky OE. A normal finite register saturation bound
+  has all 64 significand bits set after PC rounding. Memory bounds retain their
+  format widths. These are source-derived policies awaiting original captures;
+  [the investigation](research/DIRECTED_OVERFLOW.md) records the printed
+  discrepancy and decoded-path evidence.
 
 ## Evidence required for a 1:1 claim
 

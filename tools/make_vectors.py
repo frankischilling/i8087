@@ -81,12 +81,23 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
                         raw = (exponent | sign << 15, significand)
                         add(f"FRNDINT {raw[0]:04x}:{raw[1]:016x} pc={pc} rc={rc}",
                             0xD9, 0xFC, raw, cw=0xBF | pc << 8 | rc << 10)
+    if suite in ("overflow", "all"):
+        for pc in (0, 2, 3):
+            for rc in range(4):
+                for sign in range(2):
+                    a = (0x7FFE | sign << 15, 2 * J - 1)
+                    for name, opcode, b in (("FADD", 0xC1, a),
+                                             ("FSUB", 0xE1, (a[0] ^ 0x8000, a[1])),
+                                             ("FMUL", 0xC9, integer(2)),
+                                             ("FDIV", 0xF1, (0x3FFE, J))):
+                        add(f"{name} masked overflow sign={sign} pc={pc} rc={rc}",
+                            0xD8, opcode, a, b, cw=0x10BF | pc << 8 | rc << 10)
     return records, names
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "all"), default="smoke")
+    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "all"), default="smoke")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     records, names = make_cases(args.suite)
