@@ -1,6 +1,6 @@
-# i8087 — Intel 8087 emulator core in C11
+# i8087: Intel 8087 emulator core in C11
 
-Version 0.2.0. An instruction-level 8087 implementation with an integer-only
+An instruction-level 8087 implementation with an integer-only
 80-bit arithmetic backend. The library does not use host floating-point
 arithmetic, `long double`, `libm`, inline assembly, or compiler-specific 128-bit
 integers.
@@ -25,7 +25,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 The library needs a C11 compiler and the standard C library. Three additional
-test suites use Python 3.10+ and its standard library; CMake skips those suites
+test suites use Python and its standard library; CMake skips those suites
 when Python is unavailable. No third-party numerical library is required.
 
 The demo executes encoded instructions for `(2 + 3) * 4`:
