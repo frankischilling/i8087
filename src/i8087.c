@@ -517,6 +517,10 @@ static i8087_result special_instruction(transaction *t,uint8_t m) {
         accept_numeric(t,&r);set_st(&t->f,0,r.value);break;
     case 0xfd:scale_instruction(t);break;
     case 0xf0:case 0xf1:case 0xf2:case 0xf3:case 0xf9:
+        /* F2XM1 #0902 returns on a ZERO tag before signaling precision or
+           writing a result. Restrict this exit to canonical signed zeros. */
+        if(m==0xf0 && i8087_tag(&t->f,0)==I8087_TAG_ZERO &&
+           i8087_get_st(&t->f,0,&x) && !x.significand && !(x.sign_exponent&0x7fff))break;
         /* Die-decoded FPTAN #1039..1060: zero and positive normal angles
            with exponent <= -64 bypass CORDIC and return the original angle
            plus denominator 1. PC and RC do not round these raw transfers. */

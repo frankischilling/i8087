@@ -173,3 +173,16 @@ blocked. All of these expectations are document/die-derived or model-only.
 They do not establish agreement with a physical 8087. See
 [the investigation](research/DIRECTED_OVERFLOW.md) for the source discrepancy
 and limits of the decoded-path inference.
+
+## F2XM1 signed-zero return
+
+The encoded-instruction regressions add 2,048 canonical signed-zero cases across
+PC/RC fields, TOP, exception masks, sticky flags and empty/full surrounding
+stacks. They check raw storage, tags, control and the absence of a new exception
+or interrupt. Pseudozeros and inconsistent tags retain their guards. The first
+new instruction check fails before the correction and passes afterward.
+
+The smoke capture campaign adds 24 masked signed-zero inputs covering documented
+PC fields and all rounding settings. These are inputs, not hardware outputs.
+[The source investigation](research/F2XM1_ZERO.md) records the precise early
+return and the unverified condition-bit, general-operand and timing behavior.

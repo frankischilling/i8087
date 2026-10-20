@@ -363,11 +363,42 @@ static void masked_directed_overflow(void) {
         for(i=0;i<10;++i)CHECK(memory[i]==0x5a);
     }
 }
+static void exponential_signed_zero(void) {
+    unsigned sign,pc,rc,top,sticky,masks,full,p;
+    for(sign=0;sign<2;++sign)for(pc=0;pc<4;++pc)for(rc=0;rc<4;++rc)
+    for(top=0;top<8;++top)for(sticky=0;sticky<2;++sticky)for(masks=0;masks<2;++masks)
+    for(full=0;full<2;++full) {
+        i8087 f,before;
+        i8087_f80 zero={0,(uint16_t)(sign<<15)};
+        unsigned count=writes;
+        i8087_init(&f);
+        for(p=0;p<8;++p)f.registers[p]=(i8087_f80){JBIT+p,0x3fff};
+        f.tags=full?0:0xffff;
+        f.control=(uint16_t)((0x0080u|(pc<<8)|(rc<<10))|(masks?0x3fu:0u));
+        f.status=(uint16_t)((top<<11)|CC|(sticky?0x3f:0));
+        slot(&f,0,zero,I8087_TAG_ZERO);before=f;
+        CHECK(op(&f,0xd9,0xf0)==I8087_OK);CHECK(f.last_gap==0);CHECK(f.used_approximations==0);
+        CHECK(same_registers(&f,&before));CHECK((f.status&0x3f)==(before.status&0x3f));
+        CHECK(!(f.status&(I8087_IR|I8087_BUSY)));CHECK(f.control==before.control);
+        CHECK(writes==count);CHECK(!i8087_interrupt_asserted(&f));
+    }
+    /* A pseudozero or a mismatched tag does not establish the decoded exit. */
+    for(sign=0;sign<2;++sign) {
+        i8087 f,before;
+        i8087_init(&f);slot(&f,0,(i8087_f80){0,(uint16_t)(0x4000|(sign<<15))},I8087_TAG_VALID);
+        before=f;CHECK(op(&f,0xd9,0xf0)==I8087_UNVERIFIED);CHECK(same_registers(&f,&before));
+        i8087_init(&f);slot(&f,0,(i8087_f80){0,(uint16_t)(sign<<15)},I8087_TAG_VALID);
+        before=f;CHECK(op(&f,0xd9,0xf0)==I8087_UNVERIFIED);CHECK(same_registers(&f,&before));
+        i8087_init(&f);slot(&f,0,(i8087_f80){JBIT,(uint16_t)(0x3ffd|(sign<<15))},I8087_TAG_ZERO);
+        before=f;CHECK(op(&f,0xd9,0xf0)==I8087_UNVERIFIED);CHECK(same_registers(&f,&before));
+    }
+}
 int main(void) {
     extract_fields();remainder_flags();scale_early_exit_and_fields();tangent_tiny();
     pseudozeros_and_tags();exceptions_and_interrupt_latch();range_destinations_and_nan_signs();
     round_integer_raw_encodings();
     masked_directed_overflow();
+    exponential_signed_zero();
     printf("PASS: %lu original-8087 regression assertions (document-derived, not hardware captures)\n",checks);
     return 0;
 }

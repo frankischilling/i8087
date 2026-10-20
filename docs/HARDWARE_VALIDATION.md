@@ -38,7 +38,7 @@ The generator writes three files:
 | `cases.json` | Case names, indices and SHA-256 of the input file |
 | `capture-metadata.template.json` | Unfilled provenance form, explicitly not a capture |
 
-The smoke suite has 388 input cases; the research suite has 48. `--suite research`
+The smoke suite has 412 input cases; the research suite has 48. `--suite research`
 selects deliberately unverified areas. `--suite frndint` supplies 384 masked
 FRNDINT inputs covering raw unnormals, denormals, pseudozeros, signed zeros and
 integral/fractional boundaries across control modes. `--suite all` combines the
