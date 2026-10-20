@@ -99,6 +99,16 @@ ctest --test-dir build-sanitize -V
 sh tools/hardware/build.sh
 ```
 
+## C formatting
+
+The repository's `.clang-format` defines the C style. Apply it to tracked
+sources and headers from the source root:
+
+```sh
+git ls-files -z -- '*.c' '*.h' | xargs -0 clang-format -i
+git ls-files -z -- '*.c' '*.h' | xargs -0 clang-format --dry-run --Werror
+```
+
 ## Not established
 
 No complete 1:1 equivalence, full original transcendental outputs, arbitrary

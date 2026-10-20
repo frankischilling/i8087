@@ -34,10 +34,8 @@ i8087_f80 sf_from_u64(uint64_t x, bool negative);
 i8087_f80 sf_from_signed_bits(uint64_t bits, unsigned width);
 /* FLD32/64 preserve denormal significance as an 8087 unnormal. */
 i8087_f80 sf_load_ieee(uint64_t bits, unsigned width, uint16_t *flags);
-uint64_t sf_store_ieee(i8087_f80 x, unsigned width, unsigned rc,
-                       uint16_t *flags, bool *rounded_up);
-uint64_t sf_to_integer(i8087_f80 x, unsigned width, unsigned rc,
-                       uint16_t *flags, bool *rounded_up);
+uint64_t sf_store_ieee(i8087_f80 x, unsigned width, unsigned rc, uint16_t *flags, bool *rounded_up);
+uint64_t sf_to_integer(i8087_f80 x, unsigned width, unsigned rc, uint16_t *flags, bool *rounded_up);
 sf_result sf_round_integer(i8087_f80 x, unsigned rc);
 sf_result sf_add(i8087_f80 a, i8087_f80 b, unsigned precision, unsigned rc);
 sf_result sf_multiply(i8087_f80 a, i8087_f80 b, unsigned precision, unsigned rc);
@@ -47,6 +45,6 @@ sf_result sf_scale(i8087_f80 x, int32_t delta, unsigned rc);
 /* -1,0,1, or 2 for unordered. Normalizes numeric values for comparison. */
 int sf_compare(i8087_f80 a, i8087_f80 b);
 /* An exact bounded integer remainder step; quotient bits are magnitude bits. */
-i8087_f80 sf_remainder(i8087_f80 a, i8087_f80 b,
-                       uint8_t *quotient, bool *partial, unsigned *qwidth);
+i8087_f80 sf_remainder(i8087_f80 a, i8087_f80 b, uint8_t *quotient, bool *partial,
+                       unsigned *qwidth);
 #endif
