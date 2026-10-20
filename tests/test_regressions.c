@@ -247,9 +247,70 @@ static void range_destinations_and_nan_signs(void) {
     CHECK(op(&f,0xd8,0xd9)==I8087_PENDING_INTERRUPT);CHECK(!f.last_gap);
     CHECK(same_registers(&f,&before));CHECK((f.status&CC)==(before.status&CC));
 }
+static void round_integer_raw_encodings(void) {
+    /* Intel S-70 Table S-25 requires normalization before rounding an unnormal.
+       Expected encodings below are literals, not results from soft80 helpers. */
+    static const i8087_f80 results[]={
+        {0,0},{JBIT,0x3fff},{JBIT,0x4000},{UINT64_C(0xc000000000000000),0x4000},
+        {UINT64_MAX,0x403e},{JBIT,0x403f},{JBIT+2,0x403f}
+    };
+    static const struct {
+        i8087_f80 input;
+        unsigned positive[4],negative[4];
+        bool fractional,denormal;
+    } cases[]={
+        {{1,0x403e},{1,1,1,1},{1,1,1,1},false,false},
+        {{UINT64_C(0x4000000000000000),0x4040},{5,5,5,5},{5,5,5,5},false,false},
+        {{0,0x4040},{0,0,0,0},{0,0,0,0},false,false},
+        {{1,0x403d},{0,0,1,0},{0,1,0,0},true,false},
+        {{3,0x403d},{2,1,2,1},{2,2,1,1},true,false},
+        {{5,0x403d},{2,2,3,2},{2,3,2,2},true,false},
+        {{1,1},{0,0,1,0},{0,1,0,0},true,false},
+        {{1,0},{0,0,1,0},{0,1,0,0},true,true},
+        {{JBIT,0x3ffe},{0,0,1,0},{0,1,0,0},true,false},
+        {{0,0},{0,0,0,0},{0,0,0,0},false,false},
+        {{UINT64_MAX,0x403e},{4,4,4,4},{4,4,4,4},false,false},
+        {{UINT64_C(0x4000000000000001),0x4040},{6,6,6,6},{6,6,6,6},false,false}
+    };
+    static const unsigned tops[]={0,3,7};
+    unsigned c,sign,pc,rc,masks,top_index,p;
+    for(c=0;c<sizeof(cases)/sizeof(cases[0]);++c)
+    for(sign=0;sign<2;++sign)for(pc=0;pc<4;++pc)for(rc=0;rc<4;++rc)
+    for(masks=0;masks<4;++masks)for(top_index=0;top_index<3;++top_index) {
+        i8087 f,before;
+        i8087_f80 input=cases[c].input,expected=results[sign?cases[c].negative[rc]:cases[c].positive[rc]];
+        uint16_t disabled=(uint16_t)(((masks&1)?I8087_DE:0)|((masks&2)?I8087_PE:0));
+        uint16_t flags=(uint16_t)((cases[c].denormal?I8087_DE:0)|(cases[c].fractional?I8087_PE:0));
+        bool abort=cases[c].denormal&&(masks&1);
+        bool pending;
+        unsigned count=writes;
+        input.sign_exponent|=(uint16_t)(sign<<15);expected.sign_exponent|=(uint16_t)(sign<<15);
+        if(abort){expected=input;flags=I8087_DE;}
+        pending=(flags&disabled)!=0;
+        i8087_init(&f);
+        f.control=(uint16_t)((0x00bfu|(pc<<8)|(rc<<10))&~disabled);
+        f.status=(uint16_t)((tops[top_index]<<11)|CC|I8087_IE);
+        slot(&f,0,input,cases[c].denormal?I8087_TAG_SPECIAL:
+             (!input.significand&&!(input.sign_exponent&0x7fff)?I8087_TAG_ZERO:I8087_TAG_VALID));
+        before=f;
+        CHECK(op(&f,0xd9,0xfc)==(pending?I8087_PENDING_INTERRUPT:I8087_OK));
+        CHECK(eq(st(&f,0),expected));CHECK(f.last_gap==0);CHECK(f.used_approximations==0);
+        CHECK((f.status&0x3f)==(I8087_IE|flags));
+        CHECK((f.status&(I8087_IR|I8087_BUSY))==(pending?(I8087_IR|I8087_BUSY):0));
+        CHECK(i8087_top(&f)==tops[top_index]);CHECK(f.control==before.control);
+        CHECK(i8087_tag(&f,0)==(unsigned)(abort?I8087_TAG_SPECIAL:
+              (expected.significand?I8087_TAG_VALID:I8087_TAG_ZERO)));
+        CHECK(writes==count);
+        for(p=0;p<8;++p)if(p!=tops[top_index]) {
+            CHECK(eq(f.registers[p],before.registers[p]));
+            CHECK(((f.tags>>(2*p))&3)==I8087_TAG_EMPTY);
+        }
+    }
+}
 int main(void) {
     extract_fields();remainder_flags();scale_early_exit_and_fields();tangent_tiny();
     pseudozeros_and_tags();exceptions_and_interrupt_latch();range_destinations_and_nan_signs();
+    round_integer_raw_encodings();
     printf("PASS: %lu original-8087 regression assertions (document-derived, not hardware captures)\n",checks);
     return 0;
 }

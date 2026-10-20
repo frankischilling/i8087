@@ -111,7 +111,17 @@ def main():
         assert read_trace(fresh_output).instruction_address == 0x12345
         assert src.read_bytes() == preserved and reference.read_bytes() == reference_bytes
         tests += 1
-    print(f"PASS: {tests} trace-tool scenarios; {len(records)} model-only round trips; no hardware evidence")
+        # Capture-ready masked inputs exercise generation/replay only here.
+        rounding, labels = make_cases("frndint")
+        assert len(rounding) == len(labels) == 384
+        rounding_src, rounding_dst = directory / "rounding-input.bin", directory / "rounding-model.bin"
+        write_trace(rounding_src, INPUT_MAGIC, rounding)
+        subprocess.run([replay, str(rounding_src), str(rounding_dst)], check=True, capture_output=True)
+        rounding_out = read_trace(rounding_dst)
+        report = compare(read_trace(rounding_src), rounding_out, rounding_out, True)
+        assert report["matched"] == 384 and not report["blocked"] and not report["approximated"]
+        tests += 1
+    print(f"PASS: {tests} trace-tool scenarios; {len(records)} smoke and {len(rounding)} FRNDINT model-only round trips; no hardware evidence")
 
 if __name__ == "__main__":
     main()

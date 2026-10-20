@@ -38,9 +38,12 @@ The generator writes three files:
 | `cases.json` | Case names, indices and SHA-256 of the input file |
 | `capture-metadata.template.json` | Unfilled provenance form, explicitly not a capture |
 
-The smoke suite has 388 input cases; the research suite has 48. `--suite research` selects deliberately
-unverified areas, and `--suite all` combines the suites. Input generation alone
-establishes nothing about the chip or the emulator's accuracy.
+The smoke suite has 388 input cases; the research suite has 48. `--suite research`
+selects deliberately unverified areas. `--suite frndint` supplies 384 masked
+FRNDINT inputs covering raw unnormals, denormals, pseudozeros, signed zeros and
+integral/fractional boundaries across control modes. `--suite all` combines the
+three suites. Input generation alone establishes nothing about the chip or the
+emulator's accuracy.
 
 `tools/hardware/CAPTURE.COM` is supplied together with its assembly source. The
 build script can reproduce it using GNU `as` and `ld` with 32-bit ELF support;
