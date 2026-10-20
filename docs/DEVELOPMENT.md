@@ -11,6 +11,8 @@ and UndefinedBehaviorSanitizer on Linux, and MSVC on Windows. Compiler warnings
 are errors. Python 3.10 checks the supported minimum; the other jobs use Python
 3.14. CI verifies test discovery so a missing Python interpreter cannot silently
 remove the independent numerical suites. Test reports are retained as artifacts.
+The replay tool and numerical test driver retain ISO C stdio on MSVC through
+the target-local `_CRT_SECURE_NO_WARNINGS` setting; other warnings stay enabled.
 
 A separate job builds the library, replay tool and demo with tests disabled.
 It also rebuilds the DOS collector and compares it with the supplied binary.
