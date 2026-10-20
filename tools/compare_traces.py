@@ -19,7 +19,7 @@ def mask_for(esc: int, modrm: int, reference: bytes, all_bits: bool) -> bytes:
     elif esc == 0xD9 and modrm == 0xF8:
         status = struct.unpack_from("<H", reference, 2)[0]
         swmask = 0xBCBF if status & 0x400 else 0xFFBF
-    elif (esc == 0xD8 and 0xD0 <= modrm <= 0xDF) or (esc == 0xD9 and modrm == 0xE4) or (esc == 0xDE and modrm == 0xD9):
+    elif (esc in (0xD8, 0xDC) and 0xD0 <= modrm <= 0xDF) or (esc == 0xD9 and modrm == 0xE4) or (esc == 0xDE and (0xD0 <= modrm <= 0xD7 or modrm == 0xD9)):
         swmask = 0xFFBF
     struct.pack_into("<H", mask, 0, 0x1FBF)
     struct.pack_into("<H", mask, 2, swmask)

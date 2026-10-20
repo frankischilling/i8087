@@ -12,6 +12,9 @@
   expectations; provide masked inputs for future hardware collection.
 - Add a constant-load capture campaign across controls and stack positions.
   Keep unresolved payloads guarded and count blocked model rows separately.
+- Accept all 72 alternate register encodings explicitly listed in Intel
+  Table A-2, including the two tag writes of FFREE-plus-pop. Align replay,
+  capture inputs, comparison masks and the unverified DOS collector.
 - Apply Intel's masked directed-overflow flag rule in the instruction layer
   and construct the normal finite register bound at full width after PC
   adjustment. Keep memory formats width-limited and preserve prior sticky OE.

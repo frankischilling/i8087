@@ -212,3 +212,28 @@ The smoke capture campaign adds 24 masked signed-zero inputs covering documented
 PC fields and all rounding settings. These are inputs, not hardware outputs.
 [The source investigation](research/F2XM1_ZERO.md) records the precise early
 return and the unverified condition-bit, general-operand and timing behavior.
+
+## Original alternate encodings
+
+The regression suite exercises all 72 Intel-documented alternate register
+forms at every TOP. Its 442,368 cases cover every PC/RC field, both gap policies,
+IE/DE masks, empty registers, mismatched tags, NaN payloads, denormals, signed
+zeros and sticky flags. Literal normal-state expectations check destinations,
+tags, stack effects and comparison flags; exceptional cases also compare
+against the corresponding existing operation. Each committed form must save
+its actual opcode. Adjacent reserved/later encodings remain rejected.
+
+The FFREE-plus-pop tests independently require both tag writes before the TOP
+increment, with every raw register payload preserved. The first new acceptance
+check failed against the rejecting decoder and passes after the correction.
+See [the manual and microcode evidence](research/ALTERNATE_ENCODINGS.md).
+
+A separate 72-input masked campaign checks generation and model replay. A
+synthetic flag change must produce 24 comparison mismatches in the default
+mask view. The collector binary is rebuilt from the updated permitted-opcode
+list and its instruction stream inspected. It has not been executed under DOS
+or on an original 8087; none of these tests supplies physical evidence.
+
+All six suites passed locally with GCC and MSVC on Windows and Clang with
+ASan/UBSan under Linux for this change. Hosted checks are still required
+before merging the pull request.

@@ -393,12 +393,108 @@ static void exponential_signed_zero(void) {
         before=f;CHECK(op(&f,0xd9,0xf0)==I8087_UNVERIFIED);CHECK(same_registers(&f,&before));
     }
 }
+static void alternate_register_encodings(void) {
+    enum { STORE_POP, EXCHANGE, COMPARE, COMPARE_POP, FREE_POP };
+    /* Intel Table A-2, S-112..S-114: the nine starred encoding groups. */
+    static const struct {uint8_t esc,base,canonical_esc,canonical_base;unsigned kind;} forms[]={
+        {0xd9,0xd8,0xdd,0xd8,STORE_POP},
+        {0xdc,0xd0,0xd8,0xd0,COMPARE},
+        {0xdc,0xd8,0xd8,0xd8,COMPARE_POP},
+        {0xdd,0xc8,0xd9,0xc8,EXCHANGE},
+        {0xde,0xd0,0xd8,0xd8,COMPARE_POP},
+        {0xdf,0xc0,0,0,FREE_POP},
+        {0xdf,0xc8,0xd9,0xc8,EXCHANGE},
+        {0xdf,0xd0,0xdd,0xd8,STORE_POP},
+        {0xdf,0xd8,0xdd,0xd8,STORE_POP}
+    };
+    unsigned form,top,i,state,mode,trap,policy,k;
+    for(form=0;form<sizeof(forms)/sizeof(forms[0]);++form)
+    for(top=0;top<8;++top)for(i=0;i<8;++i)for(state=0;state<8;++state)
+    for(mode=0;mode<16;++mode)for(trap=0;trap<3;++trap)for(policy=0;policy<2;++policy) {
+        i8087 f,before,canonical,expected;
+        i8087_result result,want;
+        unsigned kind=forms[form].kind,dest=(top+i)&7;
+        i8087_init(&f);f.status=(uint16_t)((top<<11)|CC);
+        f.control=(uint16_t)(0x10bf|((mode&3)<<8)|((mode>>2)<<10));
+        if(trap)f.control&=(uint16_t)~(trap==1?I8087_IE:I8087_DE);
+        i8087_set_policy(&f,policy?I8087_ALLOW_APPROXIMATION:I8087_STOP_ON_UNVERIFIED);
+        for(k=0;k<8;++k)number(&f,k,integer((int)k+1));
+        switch(state) {
+        case 1:slot(&f,0,f.registers[top],I8087_TAG_EMPTY);break;
+        case 2:slot(&f,i,f.registers[dest],I8087_TAG_EMPTY);break;
+        case 3:
+            slot(&f,0,(i8087_f80){UINT64_C(0x8123456789abcdef),0xffff},I8087_TAG_VALID);
+            if(i)slot(&f,i,(i8087_f80){123,0xc123},I8087_TAG_ZERO);
+            break;
+        case 4:number(&f,0,(i8087_f80){1,0});break;
+        case 5:number(&f,0,(i8087_f80){UINT64_C(0xc123456789abcdef),0x7fff});break;
+        case 6:number(&f,0,(i8087_f80){0,0x8000});number(&f,i,(i8087_f80){0,0});break;
+        case 7:f.status|=0x3f;break;
+        default:break;
+        }
+        before=canonical=expected=f;
+        result=op(&f,forms[form].esc,(uint8_t)(forms[form].base+i));
+        CHECK(result!=I8087_BAD_OPCODE);
+        if(kind==FREE_POP) {
+            /* Both ST(i) and old ST(0) become empty; FINCSTP alone cannot
+               replace the second tag write. Recovered words #0074..0077. */
+            expected.tags|=(uint16_t)((3u<<(2*dest))|(3u<<(2*top)));
+            expected.status=(uint16_t)((expected.status&0xc7ffu)|(((top+1)&7)<<11));
+            CHECK(result==I8087_OK);CHECK(same_registers(&f,&expected));
+            CHECK(f.status==expected.status);CHECK(f.last_gap==0);
+        } else {
+            want=op(&canonical,forms[form].canonical_esc,(uint8_t)(forms[form].canonical_base+i));
+            CHECK(result==want);CHECK(same_registers(&f,&canonical));
+            CHECK(f.status==canonical.status);CHECK(f.control==canonical.control);
+            CHECK(f.last_gap==canonical.last_gap);
+            CHECK(f.used_approximations==canonical.used_approximations);
+            CHECK(f.cpu_waiting==canonical.cpu_waiting);
+            if(state==0) {
+                if(kind==STORE_POP) {
+                    slot(&expected,i,before.registers[top],I8087_TAG_VALID);
+                    expected.tags|=(uint16_t)(3u<<(2*top));
+                    expected.status=(uint16_t)((before.status&0xc7ffu)|(((top+1)&7)<<11));
+                } else if(kind==EXCHANGE) {
+                    expected.registers[top]=before.registers[dest];
+                    expected.registers[dest]=before.registers[top];
+                } else {
+                    expected.status=(uint16_t)((before.status&~(I8087_C0|I8087_C2|I8087_C3))|
+                                              (i?I8087_C0:I8087_C3));
+                    if(kind==COMPARE_POP) {
+                        expected.tags|=(uint16_t)(3u<<(2*top));
+                        expected.status=(uint16_t)((expected.status&0xc7ffu)|(((top+1)&7)<<11));
+                    }
+                }
+                CHECK(result==I8087_OK);CHECK(same_registers(&f,&expected));
+                CHECK(f.status==expected.status);
+            }
+        }
+        CHECK(f.control==before.control);CHECK(f.data_address==before.data_address);
+        if(result==I8087_UNVERIFIED) {
+            CHECK(f.opcode==before.opcode);CHECK(f.instruction_address==before.instruction_address);
+        } else {
+            CHECK(f.opcode==(uint16_t)(((forms[form].esc&7u)<<8)|(forms[form].base+i)));
+            CHECK(f.instruction_address==0x12345);
+        }
+    }
+    /* Adjacent reserved and later additions are not covered by the footnotes. */
+    {
+        static const uint8_t rejected[][2]={{0xd9,0xd1},{0xd9,0xd7},{0xdd,0xe0},
+            {0xde,0xd8},{0xde,0xda},{0xdf,0xe0},{0xdf,0xff}};
+        for(i=0;i<sizeof(rejected)/sizeof(rejected[0]);++i) {
+            i8087 f,before;i8087_init(&f);before=f;
+            CHECK(op(&f,rejected[i][0],rejected[i][1])==I8087_BAD_OPCODE);
+            CHECK(same_registers(&f,&before));CHECK(f.status==before.status);
+        }
+    }
+}
 int main(void) {
     extract_fields();remainder_flags();scale_early_exit_and_fields();tangent_tiny();
     pseudozeros_and_tags();exceptions_and_interrupt_latch();range_destinations_and_nan_signs();
     round_integer_raw_encodings();
     masked_directed_overflow();
     exponential_signed_zero();
+    alternate_register_encodings();
     printf("PASS: %lu original-8087 regression assertions (document-derived, not hardware captures)\n",checks);
     return 0;
 }

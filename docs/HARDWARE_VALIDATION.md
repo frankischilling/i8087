@@ -47,7 +47,8 @@ Select a campaign with `--suite`:
 | `frndint` | 384 | Raw operand classes and rounding boundaries across PC/RC fields |
 | `overflow` | 96 | Masked arithmetic overflow across signs and control modes; 24 CHOP rows remain guarded |
 | `constants` | 2,688 | All seven loads, documented PC fields, RC, TOP, empty/full stacks and clear/set sticky PE |
-| `all` | 3,628 | Combined campaigns |
+| `encodings` | 72 | The nine alternate register groups in Intel Table A-2 |
+| `all` | 3,700 | Combined campaigns |
 
 The constant campaign preserves known raw bytes in every register and records
 which inputs have occupied stacks. Its model-only check has 384 supported
@@ -183,7 +184,9 @@ reuse it as evidence.
 
 The collector accepts only documented register-form ESC instructions, with all
 six individual exceptions masked and initial IR/BUSY clear. It deliberately
-rejects memory instructions, undocumented/later aliases and unmasked tests.
+includes the [72 alternate encodings](research/ALTERNATE_ENCODINGS.md) listed
+by Intel, while rejecting memory instructions, reserved/later encodings and
+unmasked tests.
 The test slot is rewritten and followed by a taken jump to flush the 8086/8088
 prefetch queue before execution.
 
