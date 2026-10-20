@@ -92,12 +92,25 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
                                              ("FDIV", 0xF1, (0x3FFE, J))):
                         add(f"{name} masked overflow sign={sign} pc={pc} rc={rc}",
                             0xD8, opcode, a, b, cw=0x10BF | pc << 8 | rc << 10)
+    if suite in ("constants", "all"):
+        loads = ("FLD1", "FLDL2T", "FLDL2E", "FLDPI", "FLDLG2", "FLDLN2", "FLDZ")
+        storage = tuple(integer(n) for n in range(11, 19))
+        for index, name in enumerate(loads):
+            for pc in (0, 2, 3):
+                for rc in range(4):
+                    for top in range(8):
+                        for full in (False, True):
+                            for sticky in (0, 32):
+                                add(f"{name} pc={pc} rc={rc} top={top} full={full} stickyPE={bool(sticky)}",
+                                    0xD9, 0xE8 + index, storage[0], storage[1],
+                                    cw=0xBF | pc << 8 | rc << 10, sw=top << 11 | sticky,
+                                    tags=0 if full else 0xFFFF, other=storage[2:])
     return records, names
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "all"), default="smoke")
+    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "constants", "all"), default="smoke")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     records, names = make_cases(args.suite)
