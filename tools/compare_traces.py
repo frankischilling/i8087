@@ -19,7 +19,7 @@ def mask_for(esc: int, modrm: int, reference: bytes, all_bits: bool) -> bytes:
     elif esc == 0xD9 and modrm == 0xF8:
         status = struct.unpack_from("<H", reference, 2)[0]
         swmask = 0xBCBF if status & 0x400 else 0xFFBF
-    elif (esc == 0xD8 and 0xD0 <= modrm <= 0xDF) or (esc == 0xD9 and modrm == 0xE4) or (esc == 0xDE and modrm == 0xD9):
+    elif (esc in (0xD8, 0xDC) and 0xD0 <= modrm <= 0xDF) or (esc == 0xD9 and modrm == 0xE4) or (esc == 0xDE and (0xD0 <= modrm <= 0xD7 or modrm == 0xD9)):
         swmask = 0xFFBF
     struct.pack_into("<H", mask, 0, 0x1FBF)
     struct.pack_into("<H", mask, 2, swmask)
@@ -88,7 +88,8 @@ def main() -> None:
         report["provenance"] = ("MODEL-ONLY SELF-TEST; no hardware evidence" if args.self_test else
                                 "User-supplied capture file; preserve chip/board metadata and hashes separately")
         if args.json:
-            args.json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+            with args.json.open("x", encoding="utf-8") as stream:
+                stream.write(json.dumps(report, indent=2) + "\n")
         print(json.dumps({key: value for key, value in report.items() if key != "details"}, indent=2))
         for item in report["details"][:12]:
             print(json.dumps(item))

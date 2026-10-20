@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * Intel 8086/8088 + 8087, real mode, DOS 3+. GNU as Intel syntax.
+ * Intel 8086/8088 + 8087, real mode, DOS. GNU as Intel syntax.
  * IMPORTANT: assembled/inspected, NOT executed on original hardware here.
  * Reads VECTORS.BIN, creates (never overwrites) CAPTURE.BIN in current dir.
  * Requires a real, working 8087. Owns and resets FPU state on entry/exit.
@@ -71,7 +71,7 @@ open_output:
     mov word ptr [remaining], ax
     mov dx, offset output_name
     xor cx, cx
-    mov ax, 0x5b00                  /* DOS 3+: create NEW, fail if it exists */
+    mov ax, 0x5b00                  /* create NEW, fail if it exists */
     int 0x21
     jnc output_open
     jmp output_error
@@ -225,11 +225,13 @@ validate_opcode:
     cmp al, 0xdb
     je opcode_db
     cmp al, 0xdc
-    je opcode_dc
+    je opcode_good
     cmp al, 0xdd
     je opcode_dd
     cmp al, 0xde
     je opcode_de
+    cmp al, 0xdf
+    je opcode_dd
 opcode_bad:
     stc
     ret
@@ -242,30 +244,24 @@ opcode_db:
     cmp dl, 0xe3
     ja opcode_bad
     jmp opcode_good
-opcode_dc:
-    mov al, dl
-    and al, 0x38
-    cmp al, 0x10
-    je opcode_bad
-    cmp al, 0x18
-    je opcode_bad
-    jmp opcode_good
 opcode_dd:
-    mov al, dl
-    and al, 0x38
-    cmp al, 0
-    je opcode_good
-    cmp al, 0x10
-    je opcode_good
-    cmp al, 0x18
-    je opcode_good
+    cmp dl, 0xdf
+    jbe opcode_good
     jmp opcode_bad
 opcode_de:
+    cmp dl, 0xd8
+    jb opcode_good
     cmp dl, 0xd9
     je opcode_good
-    jmp opcode_dc
+    cmp dl, 0xe0
+    jae opcode_good
+    jmp opcode_bad
 opcode_d9:
     cmp dl, 0xd0
+    jbe opcode_good
+    cmp dl, 0xd8
+    jb opcode_bad
+    cmp dl, 0xdf
     jbe opcode_good
     cmp dl, 0xe0
     je opcode_good

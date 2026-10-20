@@ -17,18 +17,24 @@ typedef struct i8087_f80 {
 } i8087_f80;
 
 enum {
-    I8087_IE = 0x0001, I8087_DE = 0x0002, I8087_ZE = 0x0004,
-    I8087_OE = 0x0008, I8087_UE = 0x0010, I8087_PE = 0x0020,
-    I8087_IR = 0x0080, I8087_C0 = 0x0100, I8087_C1 = 0x0200,
-    I8087_C2 = 0x0400, I8087_TOP = 0x3800, I8087_C3 = 0x4000,
+    I8087_IE = 0x0001,
+    I8087_DE = 0x0002,
+    I8087_ZE = 0x0004,
+    I8087_OE = 0x0008,
+    I8087_UE = 0x0010,
+    I8087_PE = 0x0020,
+    I8087_IR = 0x0080,
+    I8087_C0 = 0x0100,
+    I8087_C1 = 0x0200,
+    I8087_C2 = 0x0400,
+    I8087_TOP = 0x3800,
+    I8087_C3 = 0x4000,
     I8087_BUSY = 0x8000,
-    I8087_INTERRUPT_MASK = 0x0080, I8087_AFFINE = 0x1000
+    I8087_INTERRUPT_MASK = 0x0080,
+    I8087_AFFINE = 0x1000
 };
 
-enum {
-    I8087_TAG_VALID = 0, I8087_TAG_ZERO = 1,
-    I8087_TAG_SPECIAL = 2, I8087_TAG_EMPTY = 3
-};
+enum { I8087_TAG_VALID = 0, I8087_TAG_ZERO = 1, I8087_TAG_SPECIAL = 2, I8087_TAG_EMPTY = 3 };
 
 typedef enum i8087_result {
     I8087_OK = 0,
@@ -58,7 +64,7 @@ enum {
 };
 
 typedef struct i8087 {
-    i8087_f80 registers[8];  /* Physical registers; ST(i) = (TOP+i)&7. */
+    i8087_f80 registers[8]; /* Physical registers; ST(i) = (TOP+i)&7. */
     uint16_t control, status, tags, opcode;
     uint32_t instruction_address, data_address; /* 20-bit physical addresses. */
     i8087_policy policy;
@@ -89,10 +95,8 @@ void i8087_set_policy(i8087 *fpu, i8087_policy policy);
  * No 8086 integer instructions, instruction prefetch, bus timing or pin timing
  * are simulated. A preceding 9B WAIT is handled by i8087_wait(), separately.
  */
-i8087_result i8087_execute(i8087 *fpu, const i8087_bus *bus,
-                          uint8_t escape, uint8_t modrm,
-                          uint32_t instruction_address,
-                          uint32_t effective_address);
+i8087_result i8087_execute(i8087 *fpu, const i8087_bus *bus, uint8_t escape, uint8_t modrm,
+                           uint32_t instruction_address, uint32_t effective_address);
 
 i8087_result i8087_wait(i8087 *fpu);
 bool i8087_interrupt_asserted(const i8087 *fpu);

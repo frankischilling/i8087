@@ -99,6 +99,17 @@ ctest --test-dir build-sanitize -V
 sh tools/hardware/build.sh
 ```
 
+## C formatting
+
+The repository's `.clang-format` defines the C style: K&R braces and a blank
+line between function and other definition blocks. Apply it to tracked
+sources and headers from the source root:
+
+```sh
+git ls-files -z -- '*.c' '*.h' | xargs -0 clang-format -i
+git ls-files -z -- '*.c' '*.h' | xargs -0 clang-format --dry-run --Werror
+```
+
 ## Not established
 
 No complete 1:1 equivalence, full original transcendental outputs, arbitrary
@@ -156,6 +167,17 @@ As a sensitivity check, a temporary copy of the backend was changed to bypass
 normalization based on the stored exponent. The new encoding check failed;
 the unchanged core passed. The temporary mutation is not part of the library.
 
+## Campaign and report preservation
+
+Disposable fixtures check that JSON reports cannot overwrite inputs,
+synthetic captures, model output, hard links or earlier reports. Campaign
+generation must reject existing directories before replacing any input or
+metadata, including a partially populated directory and an empty directory.
+Fresh destinations still work. Both preservation checks failed against the
+overwriting tools and pass with exclusive report creation and directory
+reservation. These checks protect files; their synthetic data is not hardware
+evidence.
+
 ## Masked directed overflow
 
 The source-derived instruction tests cover full-width register saturation,
@@ -188,3 +210,58 @@ constant-ROM or stack-fault diagnostic and leave all architectural bytes
 unchanged. Those rejections are counted as blocked. The campaign supplies no
 expected hardware bytes for the five unresolved constant payloads. See
 [the source investigation](research/CONSTANT_LOADS.md).
+
+## F2XM1 signed-zero return
+
+The encoded-instruction regressions add 2,048 canonical signed-zero cases across
+PC/RC fields, TOP, exception masks, sticky flags and empty/full surrounding
+stacks. They check raw storage, tags, control and the absence of a new exception
+or interrupt. Pseudozeros and inconsistent tags retain their guards. The first
+new instruction check fails before the correction and passes afterward.
+
+The smoke capture campaign adds 24 masked signed-zero inputs covering documented
+PC fields and all rounding settings. These are inputs, not hardware outputs.
+[The source investigation](research/F2XM1_ZERO.md) records the precise early
+return and the unverified condition-bit, general-operand and timing behavior.
+
+## Original alternate encodings
+
+The regression suite exercises all 72 Intel-documented alternate register
+forms at every TOP. Its 442,368 cases cover every PC/RC field, both gap policies,
+IE/DE masks, empty registers, mismatched tags, NaN payloads, denormals, signed
+zeros and sticky flags. Literal normal-state expectations check destinations,
+tags, stack effects and comparison flags; exceptional cases also compare
+against the corresponding existing operation. Each committed form must save
+its actual opcode. Adjacent reserved/later encodings remain rejected.
+
+The FFREE-plus-pop tests independently require both tag writes before the TOP
+increment, with every raw register payload preserved. The first new acceptance
+check failed against the rejecting decoder and passes after the correction.
+See [the manual and microcode evidence](research/ALTERNATE_ENCODINGS.md).
+
+A separate 72-input masked campaign checks generation and model replay. A
+synthetic flag change must produce 24 comparison mismatches in the default
+mask view. The collector binary is rebuilt from the updated permitted-opcode
+list and its instruction stream inspected. It has not been executed under DOS
+or on an original 8087; none of these tests supplies physical evidence.
+
+All six suites passed locally with GCC and MSVC on Windows and Clang with
+ASan/UBSan under Linux for this change. Hosted checks are still required
+before merging the pull request.
+
+## Bounded unnormal-plus-zero arithmetic
+
+The instruction suite adds 774,144 register cases across nine add/subtract
+forms, all destination indices, TOP, operand order, both signs, RC, masks,
+sticky flags and both gap policies. Literal raw expectations distinguish
+preserved unnormal storage from a normalized value. Another 192 cases check
+zero memory operands in short/long real and integer formats. Denormal memory
+loads retain their masked guard or unmasked before-operation DE response.
+Negative cases retain guards for reduced/reserved PC, pseudozeros, inconsistent
+tags and excluded exponent edges.
+
+The first new acceptance check failed before the correction. The model-only
+capture campaign adds 3,072 masked register inputs and checks raw result,
+tags, C1 and untouched storage. None of these files contains original execution
+results. [The investigation](research/UNNORMAL_ZERO_ARITHMETIC.md) explains the
+bounded J2 alignment, normalization and precision path.

@@ -2,14 +2,24 @@
 
 ## Unreleased
 
+- Use the requested C formatting with K&R braces and blank lines between
+  function and other definition blocks.
+- Preserve bounded PC64 unnormal-plus-zero add/subtract results without
+  normalizing their stored exponent and significand. Keep other unnormal
+  cases guarded and provide discriminating capture inputs.
 - Add GCC/Linux, Clang ASan/UBSan and MSVC/Windows CI, with required checks on
   `main`. Fix MSVC build diagnostics while retaining portable C stdio.
 - Preserve replay inputs and captures through exclusive output creation;
   reject incomplete or trailing reference payloads before output creation.
+- Require new JSON report files and campaign directories to preserve inputs,
+  captures, prior reports and provenance across repeated or aliased paths.
 - Test original FRNDINT normalization and exception stages with literal raw
   expectations; provide masked inputs for future hardware collection.
 - Add a constant-load capture campaign across controls and stack positions.
   Keep unresolved payloads guarded and count blocked model rows separately.
+- Accept all 72 alternate register encodings explicitly listed in Intel
+  Table A-2, including the two tag writes of FFREE-plus-pop. Align replay,
+  capture inputs, comparison masks and the unverified DOS collector.
 - Apply Intel's masked directed-overflow flag rule in the instruction layer
   and construct the normal finite register bound at full width after PC
   adjustment. Keep memory formats width-limited and preserve prior sticky OE.

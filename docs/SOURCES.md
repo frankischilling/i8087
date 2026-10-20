@@ -4,6 +4,19 @@ The implementation was written against original Intel documentation. No source
 from another emulator or floating-point library is included in this package.
 The manuals are not redistributed.
 
+The [F2XM1 signed-zero investigation](research/F2XM1_ZERO.md) combines Intel's
+signed-zero table with the decoded ZERO-tag early return. It supports that
+bounded path without using the general transcendental fallback.
+
+The [reserved FNOP encoding investigation](research/FNOP_DECODING.md) records
+why shared microcode does not establish an alias without decoder selection
+evidence. The reserved encodings remain part of the open opcode audit.
+
+The [logarithm special-case investigation](research/LOGARITHM_SPECIAL_CASES.md)
+records the FYL2XP1 ZERO-tag branch and unresolved sign operations. These
+logarithm paths remain guarded; mathematical identities do not establish their
+original raw results or exception behavior.
+
 The current [hardware-evidence search](research/HARDWARE_EVIDENCE.md) records
 revision-identification limits, the initial IBM 5150-style target and capture
 leads. A source edition or speed grade does not identify a silicon stepping.
@@ -64,6 +77,17 @@ recovered precision-adjustment and saturation ordering; a conflicting printed
 significand footnote is retained in the research record.
 
 ## Original instruction and exception details
+
+The [unnormal-plus-zero investigation](research/UNNORMAL_ZERO_ARITHMETIC.md)
+combines Intel's normalization rule with the decoded alignment and precision
+paths. It supports a bounded PC64 result that retains the unnormal exponent
+and significand; it does not establish general unnormal arithmetic.
+
+Table A-2, printed S-112 through S-114, explicitly assigns operations to nine
+register encoding groups that Intel's translators do not emit. The decoder
+accepts these 72 forms. [The encoding investigation](research/ALTERNATE_ENCODINGS.md)
+records the exact bytes, original footnotes and recovered FFREE-plus-pop tag
+sequence. Reserved encodings outside that list remain unresolved.
 
 The 1981 manual's FXTRACT description explicitly discusses signed-zero results
 and field extraction. The FPREM condition-code shift rule is also visible in

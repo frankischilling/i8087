@@ -29,6 +29,9 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
                 for op, modrm in (("FADD", 0xC1), ("FSUB", 0xE1), ("FMUL", 0xC9), ("FDIV", 0xF1)):
                     for a in (-9, -1, 1, 9):
                         add(f"{op} {a}/3 pc={pc} rc={rc}", 0xD8, modrm, integer(a), integer(3), cw)
+                for sign in range(2):
+                    add(f"F2XM1 signed zero sign={sign} pc={pc} rc={rc}",
+                        0xD9, 0xF0, (sign << 15, 0), cw=cw)
         for a in range(18):
             for old in range(8):
                 cc = (0x100 if old & 4 else 0) | (0x4000 if old & 2 else 0) | (0x200 if old & 1 else 0)
@@ -105,14 +108,40 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
                                     0xD9, 0xE8 + index, storage[0], storage[1],
                                     cw=0xBF | pc << 8 | rc << 10, sw=top << 11 | sticky,
                                     tags=0 if full else 0xFFFF, other=storage[2:])
+    if suite in ("encodings", "all"):
+        forms = ((0xD9, 0xD8, "FSTP"), (0xDC, 0xD0, "FCOM"),
+                 (0xDC, 0xD8, "FCOMP"), (0xDD, 0xC8, "FXCH"),
+                 (0xDE, 0xD0, "FCOMP"), (0xDF, 0xC0, "FFREE+pop"),
+                 (0xDF, 0xC8, "FXCH"), (0xDF, 0xD0, "FSTP"), (0xDF, 0xD8, "FSTP"))
+        for esc, base, name in forms:
+            for i in range(8):
+                add(f"Intel Table A-2 {esc:02x} {base+i:02x} {name} ST({i})", esc, base+i,
+                    integer(1), integer(2), other=tuple(integer(k) for k in range(3, 9)))
+    if suite in ("unnormal-zero", "all"):
+        payloads = ((0x4000, J >> 1), (0x4000, 1), (0x0041, 1), (0x7FFD, (J >> 1) + 1))
+        for exponent, significand in payloads:
+            for sign in range(2):
+                for zero_sign in range(2):
+                    for which in range(2):
+                        x, zero = (exponent | sign << 15, significand), (zero_sign << 15, 0)
+                        a, b = (zero, x) if which else (x, zero)
+                        for name, opcode in (("FADD", 0xC1), ("FSUB", 0xE1), ("FSUBR", 0xE9)):
+                            for rc in range(4):
+                                for top in range(8):
+                                    add(f"{name} unnormal+zero raw={x} side={which} zeroSign={zero_sign} rc={rc} top={top}",
+                                        0xD8, opcode, a, b, cw=0x03BF | rc << 10,
+                                        sw=top << 11 | 0x4700)
     return records, names
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "constants", "all"), default="smoke")
+    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "constants", "encodings", "unnormal-zero", "all"), default="smoke")
     args = parser.parse_args()
-    args.output.mkdir(parents=True, exist_ok=True)
+    try:
+        args.output.mkdir(parents=True, exist_ok=False)
+    except OSError as error:
+        parser.exit(2, f"error: require a new campaign directory: {error}\n")
     records, names = make_cases(args.suite)
     dest = args.output / "VECTORS.BIN"
     write_trace(dest, INPUT_MAGIC, records)

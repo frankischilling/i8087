@@ -7,7 +7,7 @@ import struct
 import sys
 import tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from trace_format import INPUT_MAGIC, MODEL_MAGIC, HARDWARE_MAGIC, HEADER, outcome, read_trace, vector, write_trace
+from trace_format import INPUT_MAGIC, MODEL_MAGIC, HARDWARE_MAGIC, HEADER, Trace, outcome, read_trace, vector, write_trace
 from make_vectors import make_cases
 from compare_traces import compare
 
@@ -112,6 +112,57 @@ def main():
         assert read_trace(fresh_output).instruction_address == 0x12345
         assert src.read_bytes() == preserved and reference.read_bytes() == reference_bytes
         tests += 1
+        # Synthetic capture framing tests report output safety, not a processor.
+        capture = directory / "synthetic-capture.bin"
+        capture.write_bytes(HARDWARE_MAGIC + fresh_output.read_bytes()[8:])
+        report_cmd = [sys.executable, str(Path(__file__).resolve().parents[1]/"tools"/"compare_traces.py"),
+                      str(src), str(capture), str(fresh_output), "--json"]
+        report_link = directory / "capture-hardlink.bin"
+        report_link.hardlink_to(capture)
+        old_report = directory / "old-report.json"
+        old_report.write_bytes(b"preserved comparison report")
+        protected = (src, capture, fresh_output, report_link, old_report)
+        snapshots = {path: path.read_bytes() for path in protected}
+        aliases = [str(path) for path in protected]
+        aliases.append(str(capture.parent) + "/./" + capture.name)
+        for target in aliases:
+            rejected = subprocess.run(report_cmd + [target], capture_output=True)
+            assert all(path.read_bytes() == data for path, data in snapshots.items()), \
+                "comparison report overwrote preserved evidence"
+            assert rejected.returncode == 2
+            tests += 1
+        report = directory / "fresh-report.json"
+        assert subprocess.run(report_cmd + [str(report)], capture_output=True).returncode == 0
+        assert report.is_file()
+        tests += 1
+        # Reserve a new campaign directory before writing any of its files.
+        generator = [sys.executable, str(Path(__file__).resolve().parents[1]/"tools"/"make_vectors.py")]
+        campaign = directory / "fresh-campaign"
+        assert subprocess.run(generator + [str(campaign)], capture_output=True).returncode == 0
+        generated = {path: path.read_bytes() for path in campaign.iterdir()}
+        assert len(generated) == 3
+        generated[campaign / "capture-metadata.template.json"] = b"preserved completed provenance"
+        for path, data in generated.items():
+            path.write_bytes(data)
+        for destination in (str(campaign), str(campaign.parent) + "/./" + campaign.name):
+            rejected = subprocess.run(generator + [destination, "--suite", "research"], capture_output=True)
+            assert all(path.read_bytes() == data for path, data in generated.items()), \
+                "generator replaced a preserved campaign"
+            assert rejected.returncode == 2
+            tests += 1
+        partial = directory / "partial-campaign"
+        partial.mkdir()
+        metadata = partial / "capture-metadata.template.json"
+        metadata.write_bytes(b"preserved partial campaign")
+        assert subprocess.run(generator + [str(partial)], capture_output=True).returncode == 2
+        assert metadata.read_bytes() == b"preserved partial campaign"
+        assert list(partial.iterdir()) == [metadata]
+        tests += 1
+        empty = directory / "existing-empty-campaign"
+        empty.mkdir()
+        assert subprocess.run(generator + [str(empty)], capture_output=True).returncode == 2
+        assert not list(empty.iterdir())
+        tests += 1
         # Capture-ready masked inputs exercise generation/replay only here.
         rounding, labels = make_cases("frndint")
         assert len(rounding) == len(labels) == 384
@@ -164,6 +215,51 @@ def main():
                 assert registers[1:] == old_registers[:7]
                 passed += 1
         assert passed == 384 and blocked == 2304
+        tests += 1
+        alternate, labels = make_cases("encodings")
+        assert len(alternate) == len(labels) == 72
+        alternate_src, alternate_dst = directory / "alternate-input.bin", directory / "alternate-model.bin"
+        write_trace(alternate_src, INPUT_MAGIC, alternate)
+        subprocess.run([replay, str(alternate_src), str(alternate_dst)], check=True, capture_output=True)
+        queries, results = read_trace(alternate_src), read_trace(alternate_dst)
+        assert all(row[:6] == bytes(6) for row in results.records)
+        assert compare(queries, results, results)["matched"] == 72
+        # A synthetic comparison-flag error must not disappear behind a mask.
+        changed = []
+        for query, row in zip(alternate, results.records):
+            corrupt = bytearray(row)
+            if query[0] == 0xDC or (query[0] == 0xDE and 0xD0 <= query[1] <= 0xD7):
+                corrupt[9] ^= 1  # status C0 in the saved image
+            changed.append(bytes(corrupt))
+        reference = Trace(MODEL_MAGIC, results.instruction_address, tuple(changed))
+        assert compare(queries, reference, results)["mismatched"] == 24
+        tests += 1
+        for esc, modrm in ((0xD9, 0xD1), (0xD9, 0xD7), (0xDD, 0xE0),
+                           (0xDE, 0xD8), (0xDE, 0xDA), (0xDF, 0xE0)):
+            bad = bytearray(alternate[0]);bad[:2] = bytes((esc, modrm))
+            write_trace(src, INPUT_MAGIC, [bytes(bad)])
+            assert subprocess.run([replay, str(src), str(directory / f"reserved-{esc}-{modrm}.bin")],
+                                  capture_output=True).returncode != 0
+            tests += 1
+        unnormal, labels = make_cases("unnormal-zero")
+        assert len(unnormal) == len(labels) == 3072
+        unnormal_src, unnormal_dst = directory / "unnormal-input.bin", directory / "unnormal-model.bin"
+        write_trace(unnormal_src, INPUT_MAGIC, unnormal)
+        subprocess.run([replay, str(unnormal_src), str(unnormal_dst)], check=True, capture_output=True)
+        for query, raw in zip(unnormal, read_trace(unnormal_dst).records):
+            result, gaps, sw, tags, registers = outcome(raw)
+            assert result == gaps == 0
+            initial_sw, initial_tags = struct.unpack_from("<HH", query, 4)
+            top = (initial_sw >> 11) & 7
+            old = tuple((e, s) for s, e in struct.iter_unpack("<QH", query[16:]))
+            zero_first = old[0][1] == 0
+            exponent, significand = old[int(zero_first)]
+            if (query[1] == 0xE1 and zero_first) or (query[1] == 0xE9 and not zero_first):
+                exponent ^= 0x8000
+            assert registers[0] == (exponent, significand)
+            assert registers[1:] == old[1:]
+            assert sw == initial_sw & ~0x200
+            assert tags == initial_tags & ~(3 << (2 * top))
         tests += 1
     print(f"PASS: {tests} trace-tool scenarios; {len(records)} smoke and {len(rounding)} FRNDINT model-only round trips; no hardware evidence")
 

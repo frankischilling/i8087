@@ -19,9 +19,9 @@ files only in the current directory and refuses to overwrite CAPTURE.BIN.
 
 ## Prepare inputs and collector
 
-From the source root on a development system, use a fresh output directory
-for each capture campaign. The generator writes its three output files, so do
-not rerun it over a directory containing preserved inputs/provenance:
+From the source root on a development system, select a new output directory
+for each capture campaign. The generator creates it and refuses any existing
+directory, including an empty one, before writing its three files:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -42,12 +42,14 @@ Select a campaign with `--suite`:
 
 | Suite | Inputs | Purpose |
 | --- | --- | --- |
-| `smoke` | 388 | Supported arithmetic, remainder and selected raw-state paths |
+| `smoke` | 412 | Supported arithmetic, remainder and selected raw-state paths |
 | `research` | 48 | Deliberately unverified areas |
 | `frndint` | 384 | Raw operand classes and rounding boundaries across PC/RC fields |
 | `overflow` | 96 | Masked arithmetic overflow across signs and control modes; 24 CHOP rows remain guarded |
 | `constants` | 2,688 | All seven loads, documented PC fields, RC, TOP, empty/full stacks and clear/set sticky PE |
-| `all` | 3,604 | Combined campaigns |
+| `encodings` | 72 | The nine alternate register groups in Intel Table A-2 |
+| `unnormal-zero` | 3,072 | Bounded PC64 add/subtract, signs, operand order, RC and TOP |
+| `all` | 6,772 | Combined campaigns |
 
 The constant campaign preserves known raw bytes in every register and records
 which inputs have occupied stacks. Its model-only check has 384 supported
@@ -106,6 +108,11 @@ python3 tools/compare_traces.py captures/smoke/VECTORS.BIN \
   captures/smoke/CAPTURE.BIN captures/smoke/MODEL.BIN \
   --json captures/smoke/report.json
 ```
+
+The JSON report also requires a new filename. An existing report, input,
+capture or model file is preserved even when the path is an alias or hard link.
+An interrupted write can leave an incomplete report or campaign directory;
+preserve it for inspection and choose a new destination for the next run.
 
 The collector records the physical address of its patched test instruction.
 `--reference` supplies that same address to the emulator so pointer fields can
@@ -178,7 +185,9 @@ reuse it as evidence.
 
 The collector accepts only documented register-form ESC instructions, with all
 six individual exceptions masked and initial IR/BUSY clear. It deliberately
-rejects memory instructions, undocumented/later aliases and unmasked tests.
+includes the [72 alternate encodings](research/ALTERNATE_ENCODINGS.md) listed
+by Intel, while rejecting memory instructions, reserved/later encodings and
+unmasked tests.
 The test slot is rewritten and followed by a taken jump to flush the 8086/8088
 prefetch queue before execution.
 

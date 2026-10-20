@@ -19,17 +19,17 @@ exception or electrical behavior. Passing counts must not be presented as an
 | --- | --- | --- |
 | State | Eight raw 80-bit physical registers, TOP, tags, control/status and pointers | Public struct is not packed; arbitrary inconsistent tags/values are not certified |
 | Transfers | Register/tag-preserving transfers; 32/64/80-bit real, signed integer, valid packed BCD formats | Noncanonical/invalid BCD cases and exact NaN payload rules need hardware evidence |
-| Finite arithmetic | Integer-software add, subtract, multiply, divide, square root, rounding; 24/53/64-bit precision and four rounding modes | Original unnormal arithmetic retains lost significance in ways the fallback does not reproduce |
+| Finite arithmetic | Integer-software add, subtract, multiply, divide, square root, rounding; 24/53/64-bit precision and four rounding modes; bounded PC64 unnormal-plus-zero add/subtract preserves raw representation | General original unnormal significance propagation remains guarded |
 | FXTRACT | Raw-field decomposition, signed-zero pair, finite unnormal/pseudozero handling | Infinity/NaN result pairs remain guarded; finite results are document-derived, not silicon-certified |
 | FPREM | Complete finite remainder with original quotient-flag history; precision-control independent | Partial-reduction sequence and tiny-result range processing remain guarded |
 | FSCALE | Zero-tag short circuits, in-range exponent-only scaling, original finite scale domain | Several exceptional/range inputs remain guarded or unverified |
 | FPTAN | Zero and positive normal operands with stored exponent <= 0x3fbf bypass the fallback | Full CORDIC/rational datapath, rounding, two raw outputs and flags remain approximate |
-| Other transcendentals | Explicit opt-in integer-software F2XM1/FYL2X/FYL2XP1/FPATAN fallbacks | Not original microcode; no original-result bit-equivalence claim |
+| Other transcendentals | F2XM1 canonical signed-zero early return; explicit opt-in fallbacks for other inputs | General F2XM1/FYL2X/FYL2XP1/FPATAN algorithms are not original microcode; no original-result bit-equivalence claim |
 | Constants | FLD1 and FLDZ exact; other constant encodings have table entries | Other constants' original ROM bits and loading/rounding behavior remain guarded |
 | Exceptions | Separate sticky flags and event latch; before/after distinction; unmasked PE commits result/store/pop | Unmasked invalid comparison continuation and some special-result paths remain guarded; no asynchronous microinstruction model |
 | Range | Canonical unmasked register exponent wrapping; original exact-tiny UE; suppressed unmasked real stores | Reduced-PC masked underflow, CHOP-overflow disagreement, and malformed/unnormal range paths still need investigation |
 | Environment | Fourteen-byte environment and 94-byte save/restore; original 20-bit pointer layout | Reserved-bit readback and malformed restore images not hardware-certified |
-| Instruction decoding | Documented ESC forms; rejection of later extensions | Undocumented aliases not implemented; full decoder smoke test is not an ISA oracle |
+| Instruction decoding | Documented ESC forms, including the nine alternate groups in Intel Table A-2; rejection of later extensions | Reserved decoder behavior remains unresolved; full decoder smoke test is not an ISA oracle |
 | Timing/electrical | No implementation | No cycle count, prefetch snooping, queue, dummy read, DMA/arbitration, pin transition or execution-overlap model |
 
 ## Known-gap policy
@@ -47,8 +47,8 @@ validated on original hardware.
 
 | Flag | Current guard/fallback |
 | --- | --- |
-| `I8087_GAP_TRANSCENDENTAL` | General software transcendental algorithms in place of original microcode; excludes the tiny/zero FPTAN bypass |
-| `I8087_GAP_UNNORMAL` | Canonical arithmetic rather than original significance propagation; selected tiny unnormal conversions |
+| `I8087_GAP_TRANSCENDENTAL` | General software transcendental algorithms in place of original microcode; excludes canonical signed-zero F2XM1 and the tiny/zero FPTAN bypass |
+| `I8087_GAP_UNNORMAL` | General significance propagation and selected tiny unnormal conversions; excludes the bounded PC64 unnormal-plus-zero path |
 | `I8087_GAP_RANGE_EXCEPTION` | Remaining range paths, including reduced-PC masked underflow, masked CHOP overflow, and unsupported remainder/range combinations |
 | `I8087_GAP_EXCEPTION_RESTART` | Unmasked invalid comparison continuation and register range cases without a supported wrapped result |
 | `I8087_GAP_PARTIAL_REMAINDER` | Bounded software partial reduction instead of original microcode sequence |
