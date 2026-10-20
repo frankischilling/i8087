@@ -543,7 +543,7 @@ static i8087_result register_instruction(transaction *t,uint8_t esc,uint8_t m) {
         switch(m) {
         case 0xe0:t->f.control&=(uint16_t)~I8087_INTERRUPT_MASK;break;
         case 0xe1:t->f.control|=I8087_INTERRUPT_MASK;break;
-        case 0xe2:t->f.status&=(uint16_t)~(EXCEPTIONS|I8087_IR|I8087_BUSY);break;
+        case 0xe2:t->f.status&=(uint16_t)(UINT16_MAX^(EXCEPTIONS|I8087_IR|I8087_BUSY));break;
         case 0xe3:software_init(&t->f);break;
         default:return I8087_BAD_OPCODE;
         }

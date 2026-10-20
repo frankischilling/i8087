@@ -67,5 +67,6 @@ The core does not model an entire computer.
 
 Read [the API contract](docs/API.md), [test results](docs/TESTING.md), and
 [hardware-validation workflow](docs/HARDWARE_VALIDATION.md) before integration.
+See [development](docs/DEVELOPMENT.md) for CI and pull request requirements.
 Original documentation and die-analysis references are in
 [SOURCES.md](docs/SOURCES.md). Source code in this package is MIT-licensed.
