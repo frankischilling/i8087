@@ -8,6 +8,11 @@ The [reserved FNOP encoding investigation](research/FNOP_DECODING.md) records
 why shared microcode does not establish an alias without decoder selection
 evidence. The reserved encodings remain part of the open opcode audit.
 
+The [logarithm special-case investigation](research/LOGARITHM_SPECIAL_CASES.md)
+records the FYL2XP1 ZERO-tag branch and unresolved sign operations. These
+logarithm paths remain guarded; mathematical identities do not establish their
+original raw results or exception behavior.
+
 The current [hardware-evidence search](research/HARDWARE_EVIDENCE.md) records
 revision-identification limits, the initial IBM 5150-style target and capture
 leads. A source edition or speed grade does not identify a silicon stepping.
