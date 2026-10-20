@@ -126,7 +126,7 @@ of the imported package.
 
 ## Replay input integrity
 
-The trace suite now has 20 scenarios. Its additional checks use disposable files
+The trace suite includes checks that use disposable files
 to verify that path aliases, hard links and existing outputs are rejected
 without overwriting data. Truncated and trailing reference payloads must fail
 before output creation; a complete synthetic framing fixture still supplies
@@ -137,3 +137,21 @@ The input-alias regression was run against the imported tool and failed with
 `replay overwrote its input through a path alias`. The corrected tool passes
 that test. This is evidence of the file-handling correction, not processor
 accuracy.
+
+## FRNDINT raw-state regressions
+
+The instruction regression suite adds 4,608 FRNDINT cases with literal expected
+encodings. These cover raw unnormals, pseudozeros, denormals, signed zeros,
+halfway fractions and integral boundaries across signs, all PC/RC fields,
+three stack positions, and four DE/PE mask combinations. Tests distinguish
+before-operation DE rollback from a committed rounded result with an unmasked
+PE, while checking tags, untouched registers and preservation of sticky flags.
+
+The test follows the original Intel normalization rule and leaves the core's
+normalization order intact. [The source investigation](research/FRNDINT.md)
+records the manual and recovered-microcode evidence and its limits. A separate
+384-input masked suite is ready for the current hardware collector. Its
+generation and model replay are tooling checks; no hardware output is supplied.
+As a sensitivity check, a temporary copy of the backend was changed to bypass
+normalization based on the stored exponent. The new encoding check failed;
+the unchanged core passed. The temporary mutation is not part of the library.

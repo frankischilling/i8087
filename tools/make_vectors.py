@@ -70,12 +70,23 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
         add("masked stack read underflow", 0xD8, 0xC1, (0, 0), integer(1), tags=0xFFFF)
         add("masked stack push overflow", 0xD9, 0xE8, integer(1), integer(1),
             other=(integer(1),) * 6, tags=0)
+    if suite in ("frndint", "all"):
+        operands = ((0x403E, 1), (0x4040, J >> 1), (0x4040, 0),
+                    (0x403D, 1), (0x403D, 3), (0x403D, 5), (1, 1), (0, 1),
+                    (0x3FFE, J), (0, 0), (0x403E, 2 * J - 1), (0x4040, (J >> 1) + 1))
+        for exponent, significand in operands:
+            for sign in range(2):
+                for pc in range(4):
+                    for rc in range(4):
+                        raw = (exponent | sign << 15, significand)
+                        add(f"FRNDINT {raw[0]:04x}:{raw[1]:016x} pc={pc} rc={rc}",
+                            0xD9, 0xFC, raw, cw=0xBF | pc << 8 | rc << 10)
     return records, names
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--suite", choices=("smoke", "research", "all"), default="smoke")
+    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "all"), default="smoke")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     records, names = make_cases(args.suite)
