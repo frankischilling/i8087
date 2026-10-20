@@ -6,6 +6,8 @@
   `main`. Fix MSVC build diagnostics while retaining portable C stdio.
 - Preserve replay inputs and captures through exclusive output creation;
   reject incomplete or trailing reference payloads before output creation.
+- Require new JSON report files and campaign directories to preserve inputs,
+  captures, prior reports and provenance across repeated or aliased paths.
 - Test original FRNDINT normalization and exception stages with literal raw
   expectations; provide masked inputs for future hardware collection.
 - Add a constant-load capture campaign across controls and stack positions.

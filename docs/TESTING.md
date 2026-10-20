@@ -156,6 +156,17 @@ As a sensitivity check, a temporary copy of the backend was changed to bypass
 normalization based on the stored exponent. The new encoding check failed;
 the unchanged core passed. The temporary mutation is not part of the library.
 
+## Campaign and report preservation
+
+Disposable fixtures check that JSON reports cannot overwrite inputs,
+synthetic captures, model output, hard links or earlier reports. Campaign
+generation must reject existing directories before replacing any input or
+metadata, including a partially populated directory and an empty directory.
+Fresh destinations still work. Both preservation checks failed against the
+overwriting tools and pass with exclusive report creation and directory
+reservation. These checks protect files; their synthetic data is not hardware
+evidence.
+
 ## Masked directed overflow
 
 The source-derived instruction tests cover full-width register saturation,

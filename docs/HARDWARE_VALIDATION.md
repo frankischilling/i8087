@@ -19,9 +19,9 @@ files only in the current directory and refuses to overwrite CAPTURE.BIN.
 
 ## Prepare inputs and collector
 
-From the source root on a development system, use a fresh output directory
-for each capture campaign. The generator writes its three output files, so do
-not rerun it over a directory containing preserved inputs/provenance:
+From the source root on a development system, select a new output directory
+for each capture campaign. The generator creates it and refuses any existing
+directory, including an empty one, before writing its three files:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -106,6 +106,11 @@ python3 tools/compare_traces.py captures/smoke/VECTORS.BIN \
   captures/smoke/CAPTURE.BIN captures/smoke/MODEL.BIN \
   --json captures/smoke/report.json
 ```
+
+The JSON report also requires a new filename. An existing report, input,
+capture or model file is preserved even when the path is an alias or hard link.
+An interrupted write can leave an incomplete report or campaign directory;
+preserve it for inspection and choose a new destination for the next run.
 
 The collector records the physical address of its patched test instruction.
 `--reference` supplies that same address to the emulator so pointer fields can

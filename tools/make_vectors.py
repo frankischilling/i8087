@@ -115,7 +115,10 @@ def main() -> None:
     parser.add_argument("output", type=Path)
     parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "constants", "all"), default="smoke")
     args = parser.parse_args()
-    args.output.mkdir(parents=True, exist_ok=True)
+    try:
+        args.output.mkdir(parents=True, exist_ok=False)
+    except OSError as error:
+        parser.exit(2, f"error: require a new campaign directory: {error}\n")
     records, names = make_cases(args.suite)
     dest = args.output / "VECTORS.BIN"
     write_trace(dest, INPUT_MAGIC, records)
