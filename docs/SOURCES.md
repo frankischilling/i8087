@@ -4,6 +4,10 @@ The implementation was written against original Intel documentation. No source
 from another emulator or floating-point library is included in this package.
 The manuals are not redistributed.
 
+The [reserved FNOP encoding investigation](research/FNOP_DECODING.md) records
+why shared microcode does not establish an alias without decoder selection
+evidence. The reserved encodings remain part of the open opcode audit.
+
 The current [hardware-evidence search](research/HARDWARE_EVIDENCE.md) records
 revision-identification limits, the initial IBM 5150-style target and capture
 leads. A source edition or speed grade does not identify a silicon stepping.
