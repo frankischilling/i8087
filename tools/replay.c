@@ -16,13 +16,20 @@ static bool wr(void *ctx,uint32_t address,const uint8_t *src,size_t n) {
     image_bus *m=ctx;if(address!=0||n>sizeof(m->bytes))return false;
     memcpy(m->bytes,src,n);return true;
 }
+static bool complete_payload(FILE *f,uint32_t count,unsigned size) {
+    long length;
+    if(fseek(f,0,SEEK_END))return false;
+    length=ftell(f);
+    if(length<0||(uint64_t)length!=TRACE_HEADER_SIZE+(uint64_t)count*size)return false;
+    return fseek(f,(long)TRACE_HEADER_SIZE,SEEK_SET)==0;
+}
 static bool header(FILE *f,uint8_t *h,const char *magic,unsigned size) {
     unsigned i;
     if(fread(h,1,TRACE_HEADER_SIZE,f)!=TRACE_HEADER_SIZE||memcmp(h,magic,8)||
        trace_u16(h+12)!=size||trace_u16(h+14)||!trace_u32(h+8)||trace_u32(h+8)>TRACE_MAX_RECORDS||
        trace_u32(h+16)>0xfffff)return false;
     for(i=20;i<TRACE_HEADER_SIZE;++i)if(h[i])return false;
-    return true;
+    return complete_payload(f,trace_u32(h+8),size);
 }
 int main(int argc,char **argv) {
     FILE *in=NULL,*out=NULL,*ref=NULL;
@@ -50,7 +57,8 @@ int main(int argc,char **argv) {
         }
         ip=trace_u32(rh+16);
     }
-    out=fopen(argv[2],"wb");if(!out){perror("output");goto done;}
+    /* C11 exclusive creation also rejects alternate paths and hard-link aliases. */
+    out=fopen(argv[2],"wbx");if(!out){perror("new output file");goto done;}
     memcpy(h,"I87M0001",8);trace_put(h+12,TRACE_OUTPUT_SIZE,2);trace_put(h+16,ip,4);
     if(fwrite(h,1,sizeof(h),out)!=sizeof(h))goto io_error;
     for(i=0;i<count;++i) {

@@ -76,6 +76,12 @@ The file's marker records the producing tool, not cryptographic proof of origin.
 
 Copy CAPTURE.BIN back next to its original VECTORS.BIN and run:
 
+Use a new output filename for every replay. The replay tool creates its output
+exclusively and refuses to overwrite an existing file, including an alternate
+path or hard link to an input or capture. Preserve earlier model runs under
+their own names. Input and reference files must have complete payloads and no
+trailing bytes before output creation begins.
+
 ```sh
 ./build/i8087_replay captures/smoke/VECTORS.BIN captures/smoke/MODEL.BIN \
   --reference captures/smoke/CAPTURE.BIN
@@ -116,9 +122,9 @@ present, and the comparison still does not count those rows as proven passes.
 This exercises the file protocol without inventing hardware evidence:
 
 ```sh
-./build/i8087_replay captures/smoke/VECTORS.BIN captures/smoke/MODEL.BIN
+./build/i8087_replay captures/smoke/VECTORS.BIN captures/smoke/MODEL-SELFTEST.BIN
 python3 tools/compare_traces.py captures/smoke/VECTORS.BIN \
-  captures/smoke/MODEL.BIN captures/smoke/MODEL.BIN --self-test --all-bits
+  captures/smoke/MODEL-SELFTEST.BIN captures/smoke/MODEL-SELFTEST.BIN --self-test --all-bits
 ```
 
 Without the explicit `--self-test` switch the comparator rejects a MODEL file
