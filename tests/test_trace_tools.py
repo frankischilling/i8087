@@ -111,6 +111,57 @@ def main():
         assert read_trace(fresh_output).instruction_address == 0x12345
         assert src.read_bytes() == preserved and reference.read_bytes() == reference_bytes
         tests += 1
+        # Synthetic capture framing tests report output safety, not a processor.
+        capture = directory / "synthetic-capture.bin"
+        capture.write_bytes(HARDWARE_MAGIC + fresh_output.read_bytes()[8:])
+        report_cmd = [sys.executable, str(Path(__file__).resolve().parents[1]/"tools"/"compare_traces.py"),
+                      str(src), str(capture), str(fresh_output), "--json"]
+        report_link = directory / "capture-hardlink.bin"
+        report_link.hardlink_to(capture)
+        old_report = directory / "old-report.json"
+        old_report.write_bytes(b"preserved comparison report")
+        protected = (src, capture, fresh_output, report_link, old_report)
+        snapshots = {path: path.read_bytes() for path in protected}
+        aliases = [str(path) for path in protected]
+        aliases.append(str(capture.parent) + "/./" + capture.name)
+        for target in aliases:
+            rejected = subprocess.run(report_cmd + [target], capture_output=True)
+            assert all(path.read_bytes() == data for path, data in snapshots.items()), \
+                "comparison report overwrote preserved evidence"
+            assert rejected.returncode == 2
+            tests += 1
+        report = directory / "fresh-report.json"
+        assert subprocess.run(report_cmd + [str(report)], capture_output=True).returncode == 0
+        assert report.is_file()
+        tests += 1
+        # Reserve a new campaign directory before writing any of its files.
+        generator = [sys.executable, str(Path(__file__).resolve().parents[1]/"tools"/"make_vectors.py")]
+        campaign = directory / "fresh-campaign"
+        assert subprocess.run(generator + [str(campaign)], capture_output=True).returncode == 0
+        generated = {path: path.read_bytes() for path in campaign.iterdir()}
+        assert len(generated) == 3
+        generated[campaign / "capture-metadata.template.json"] = b"preserved completed provenance"
+        for path, data in generated.items():
+            path.write_bytes(data)
+        for destination in (str(campaign), str(campaign.parent) + "/./" + campaign.name):
+            rejected = subprocess.run(generator + [destination, "--suite", "research"], capture_output=True)
+            assert all(path.read_bytes() == data for path, data in generated.items()), \
+                "generator replaced a preserved campaign"
+            assert rejected.returncode == 2
+            tests += 1
+        partial = directory / "partial-campaign"
+        partial.mkdir()
+        metadata = partial / "capture-metadata.template.json"
+        metadata.write_bytes(b"preserved partial campaign")
+        assert subprocess.run(generator + [str(partial)], capture_output=True).returncode == 2
+        assert metadata.read_bytes() == b"preserved partial campaign"
+        assert list(partial.iterdir()) == [metadata]
+        tests += 1
+        empty = directory / "existing-empty-campaign"
+        empty.mkdir()
+        assert subprocess.run(generator + [str(empty)], capture_output=True).returncode == 2
+        assert not list(empty.iterdir())
+        tests += 1
         # Capture-ready masked inputs exercise generation/replay only here.
         rounding, labels = make_cases("frndint")
         assert len(rounding) == len(labels) == 384

@@ -88,7 +88,8 @@ def main() -> None:
         report["provenance"] = ("MODEL-ONLY SELF-TEST; no hardware evidence" if args.self_test else
                                 "User-supplied capture file; preserve chip/board metadata and hashes separately")
         if args.json:
-            args.json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+            with args.json.open("x", encoding="utf-8") as stream:
+                stream.write(json.dumps(report, indent=2) + "\n")
         print(json.dumps({key: value for key, value in report.items() if key != "details"}, indent=2))
         for item in report["details"][:12]:
             print(json.dumps(item))
