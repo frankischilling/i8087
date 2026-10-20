@@ -1,5 +1,20 @@
 # Changes
 
+## Unreleased
+
+- Add GCC/Linux, Clang ASan/UBSan and MSVC/Windows CI, with required checks on
+  `main`. Fix MSVC build diagnostics while retaining portable C stdio.
+- Preserve replay inputs and captures through exclusive output creation;
+  reject incomplete or trailing reference payloads before output creation.
+- Test original FRNDINT normalization and exception stages with literal raw
+  expectations; provide masked inputs for future hardware collection.
+- Apply Intel's masked directed-overflow flag rule in the instruction layer
+  and construct the normal finite register bound at full width after PC
+  adjustment. Keep memory formats width-limited and preserve prior sticky OE.
+- Record the provisional 8088/8087 target, capture search and unresolved
+  source discrepancies under `docs/research`. No original-hardware validation
+  or cycle-accuracy claim has been established.
+
 ## 0.2.0 — 2026-10-20
 
 This is an implementation and validation update, not a 1:1 certification.

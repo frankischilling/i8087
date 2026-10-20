@@ -136,7 +136,18 @@ static void accept_numeric(transaction *t,sf_result *r) {
     } else if(range) {
         r->flags|=range; /* Original underflow also reports exact tiny results. */
         if(range==I8087_OE) {
-            if(rounding(t)==3) {
+            unsigned rc=rounding(t);
+            if(rc==1||rc==2) {
+                /* Intel S-75: masked directed overflow raises PE, not OE.
+                   NONNORMAL_RESULT constructs a full-width finite bound after
+                   precision adjustment; see research/DIRECTED_OVERFLOW.md. */
+                r->flags&=(uint16_t)~I8087_OE;r->flags|=I8087_PE;
+                if(sf_kind(r->value)!=SF_INFINITY &&
+                   !(t->f.last_gap&(I8087_GAP_UNNORMAL|I8087_GAP_RANGE_EXCEPTION))) {
+                    r->value.significand=UINT64_MAX;
+                    r->value.sign_exponent=(uint16_t)(0x7ffe|(u->sign?0x8000:0));
+                }
+            } else if(rc==3) {
                 /* Intel's 1981 manual specifies infinity for masked CHOP
                    overflow. Die-level interpretation is not yet conclusive:
                    retain a guard for this specific disagreement. */
@@ -273,10 +284,16 @@ static void store_ieee(transaction *t,i8087_f80 x,unsigned width,bool do_pop) {
         flags|=I8087_UE;
         if(t->f.control&I8087_UE)gap(t,I8087_GAP_UNNORMAL);
     }
-    if((flags&I8087_OE)&&(t->f.control&I8087_OE)&&rounding(t)==3) {
-        bits=(width==32?UINT64_C(0x7f800000):UINT64_C(0x7ff0000000000000))|
-             ((uint64_t)sf_sign(x)<<(width-1));
-        gap(t,I8087_GAP_RANGE_EXCEPTION);
+    if((flags&I8087_OE)&&(t->f.control&I8087_OE)) {
+        unsigned rc=rounding(t);
+        if(rc==1||rc==2) {
+            /* S-75 applies the directed flag rule to real stores as well. */
+            flags&=(uint16_t)~I8087_OE;flags|=I8087_PE;
+        } else if(rc==3) {
+            bits=(width==32?UINT64_C(0x7f800000):UINT64_C(0x7ff0000000000000))|
+                 ((uint64_t)sf_sign(x)<<(width-1));
+            gap(t,I8087_GAP_RANGE_EXCEPTION);
+        }
     }
     t->raised|=flags;t->f.status=(uint16_t)((t->f.status&~I8087_C1)|(up?I8087_C1:0));
     t->write_size=width/8;put_le(t->bytes,bits,t->write_size);if(do_pop)pop(t);

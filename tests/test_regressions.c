@@ -307,10 +307,67 @@ static void round_integer_raw_encodings(void) {
         }
     }
 }
+static void masked_directed_overflow(void) {
+    static const unsigned pcs[]={0,2,3};
+    static const uint8_t escapes[]={0xd8,0xd8,0xd8,0xd8,0xdc,0xde,0xd8};
+    static const uint8_t encodings[]={0xc1,0xe1,0xc9,0xf1,0xc1,0xc1,0x0e};
+    unsigned pc,sign,rc,trap,sticky,form,width,popping,i;
+    for(pc=0;pc<3;++pc)for(sign=0;sign<2;++sign)for(rc=0;rc<3;++rc)
+    for(trap=0;trap<2;++trap)for(sticky=0;sticky<2;++sticky)for(form=0;form<7;++form) {
+        i8087 f;
+        i8087_f80 a={UINT64_MAX,(uint16_t)(0x7ffe|(sign<<15))},b=a,expected;
+        bool finite=(sign&&rc==2)||(!sign&&rc==1);
+        unsigned result_slot=form==4?1u:0u,count=writes;
+        uint16_t expected_flags=(uint16_t)(I8087_IE|I8087_PE|((rc==0||sticky)?I8087_OE:0));
+        if(form==1)b.sign_exponent^=0x8000;
+        else if(form==2||form==6)b=(i8087_f80){JBIT,0x4000};
+        else if(form==3)b=(i8087_f80){JBIT,0x3ffe};
+        expected=(i8087_f80){finite?UINT64_MAX:JBIT,(uint16_t)((finite?0x7ffe:0x7fff)|(sign<<15))};
+        i8087_init(&f);number(&f,0,a);number(&f,1,b);
+        f.control=(uint16_t)((0x00bfu|(pcs[pc]<<8)|(rc<<10))&~(trap?(unsigned)I8087_PE:0u));
+        f.status=(uint16_t)(I8087_IE|(sticky?I8087_OE:0));
+        memory[0]=0;memory[1]=0;memory[2]=0;memory[3]=0x40; /* binary32 +2 */
+        CHECK(op(&f,escapes[form],encodings[form])==(trap?I8087_PENDING_INTERRUPT:I8087_OK));
+        CHECK(eq(st(&f,result_slot),expected));CHECK(f.last_gap==0);
+        CHECK((f.status&0x3f)==expected_flags);
+        CHECK((f.status&(I8087_IR|I8087_BUSY))==(trap?(I8087_IR|I8087_BUSY):0));
+        CHECK(i8087_top(&f)==(form==5?1u:0u));
+        CHECK(i8087_tag(&f,result_slot)==(unsigned)(finite?I8087_TAG_VALID:I8087_TAG_SPECIAL));
+        CHECK(writes==count);
+    }
+    for(width=32;width<=64;width+=32)for(pc=0;pc<4;++pc)
+    for(sign=0;sign<2;++sign)for(rc=0;rc<3;++rc)for(trap=0;trap<2;++trap)
+    for(sticky=0;sticky<2;++sticky)for(popping=0;popping<2;++popping) {
+        i8087 f,before;
+        bool finite=(sign&&rc==2)||(!sign&&rc==1);
+        uint64_t expected=width==32?(finite?UINT64_C(0x7f7fffff):UINT64_C(0x7f800000)):
+                                       (finite?UINT64_C(0x7fefffffffffffff):UINT64_C(0x7ff0000000000000));
+        uint16_t expected_flags=(uint16_t)(I8087_PE|((rc==0||sticky)?I8087_OE:0));
+        unsigned count=writes;
+        expected|=(uint64_t)sign<<(width-1);
+        i8087_init(&f);number(&f,0,(i8087_f80){JBIT,(uint16_t)(0x6000|(sign<<15))});
+        f.control=(uint16_t)((0x00bfu|(pc<<8)|(rc<<10))&~(trap?(unsigned)I8087_PE:0u));
+        f.status=(uint16_t)(sticky?I8087_OE:0);before=f;memset(memory,0x5a,10);
+        CHECK(op(&f,(uint8_t)(width==32?0xd9:0xdd),(uint8_t)(popping?0x1e:0x16))==
+              (trap?I8087_PENDING_INTERRUPT:I8087_OK));
+        CHECK(f.last_gap==0);CHECK((f.status&0x3f)==expected_flags);
+        CHECK(i8087_top(&f)==popping);CHECK(writes==count+1);
+        for(i=0;i<width/8;++i){CHECK(memory[i]==(uint8_t)expected);expected>>=8;}
+        CHECK(memory[width/8]==0x5a);CHECK(eq(f.registers[0],before.registers[0]));
+        CHECK(i8087_tag(&f,0)==(unsigned)(popping?I8087_TAG_EMPTY:I8087_TAG_VALID));
+        /* Unmasked memory overflow still suppresses both store and pop. */
+        f=before;f.control&=(uint16_t)~(I8087_OE|I8087_PE);memset(memory,0x5a,10);count=writes;
+        CHECK(op(&f,(uint8_t)(width==32?0xd9:0xdd),(uint8_t)(popping?0x1e:0x16))==I8087_PENDING_INTERRUPT);
+        CHECK(f.last_gap==0);CHECK((f.status&0x3f)==I8087_OE);
+        CHECK(same_registers(&f,&before));CHECK(writes==count);
+        for(i=0;i<10;++i)CHECK(memory[i]==0x5a);
+    }
+}
 int main(void) {
     extract_fields();remainder_flags();scale_early_exit_and_fields();tangent_tiny();
     pseudozeros_and_tags();exceptions_and_interrupt_latch();range_destinations_and_nan_signs();
     round_integer_raw_encodings();
+    masked_directed_overflow();
     printf("PASS: %lu original-8087 regression assertions (document-derived, not hardware captures)\n",checks);
     return 0;
 }
