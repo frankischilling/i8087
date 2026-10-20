@@ -87,6 +87,11 @@ and `6088`, including their tag and condition-code effects, before removing
 the guard. Do not extend this branch to pseudozeros, inconsistent tags, empty
 registers, denormals or special Y values.
 
+The [sign-control follow-up](ZERO_SIGN_DATAPATH.md) records related words
+decoded in the later addition report. They support a specific XOR-sign
+hypothesis, while leaving destination routing and other write effects
+unresolved. The logarithm guard remains in place.
+
 ## FYL2X at canonical +1
 
 The FYL2X route begins at `#1260`. A candidate exact-power path runs through

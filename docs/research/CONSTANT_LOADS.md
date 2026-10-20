@@ -34,6 +34,19 @@ die image are therefore leads for further extraction, not verified bytes:
 [ROM view](http://static.righto.com/images/8087-constants/rom-overview.jpg),
 [whole stripped die](http://static.righto.com/images/8087-constants/stripped-big.jpg).
 
+The downloaded originals were inspected at 1,214 by 1,672 pixels for the ROM
+view and 3,941 by 5,067 pixels for the whole die. Their SHA-256 hashes are:
+
+| Image | SHA-256 |
+| --- | --- |
+| ROM view | `225e80054b1b55d59abedc9fec27554c6e4e4a57a7bd68761d45291a39bdf1cb` |
+| Whole stripped die | `558d3382a937c9b5abcfdc05c981715d1b9c64d41b9062c5f2f8e584aa82c5d1` |
+
+The close view covers part of the array; the whole-die image supplies the
+layout. A complete bit transcription, with uncertain cells identified and
+the constant-selection map checked independently, is still missing. These
+image receipts do not authenticate the candidate payloads.
+
 ## Recovered instruction path
 
 Addresses are decimal. The inspected granite snapshot is
