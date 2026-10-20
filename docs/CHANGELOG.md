@@ -15,11 +15,12 @@
   source discrepancies under `docs/research`. No original-hardware validation
   or cycle-accuracy claim has been established.
 
-## 0.2.0 — 2026-10-20
+## Imported implementation, 2026-10-20
 
 This is an implementation and validation update, not a 1:1 certification.
-The public C API remains source-compatible with 0.1.0. Internal `sf_result`
-now carries unbounded rounding information and is not a public ABI.
+The public C API remains source-compatible with the earlier implementation.
+Internal `sf_result` now carries unbounded rounding information and is not a
+public ABI.
 
 ### Instruction corrections
 

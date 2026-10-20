@@ -1,4 +1,4 @@
-# Accuracy and remaining gaps — 0.2.0
+# Accuracy and remaining gaps
 
 ## Claim boundary
 

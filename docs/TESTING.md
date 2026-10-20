@@ -1,4 +1,4 @@
-# Validation report — 0.2.0
+# Validation report
 
 Run on 2026-10-20 in a Linux x86_64 container. These are software tests, not
 original-8087 hardware measurements.
@@ -7,16 +7,16 @@ original-8087 hardware measurements.
 
 | Configuration | Result |
 | --- | --- |
-| GCC 14.2.0, C11, CMake Release, warnings as errors | All six CTest suites passed |
-| Clang 17.0.0, C11, Debug, AddressSanitizer + UndefinedBehaviorSanitizer, warnings as errors | All six suites passed; no sanitizer errors observed |
-| GNU binutils 2.44, 8086-mode DOS probe assembly | CAPTURE.COM assembled to 1,196 bytes; not executed under DOS or on hardware |
+| GCC, C11, CMake Release, warnings as errors | All six CTest suites passed |
+| Clang, C11, Debug, AddressSanitizer + UndefinedBehaviorSanitizer, warnings as errors | All six suites passed; no sanitizer errors observed |
+| GNU binutils, 8086-mode DOS probe assembly | CAPTURE.COM assembled to 1,196 bytes; not executed under DOS or on hardware |
 | Clang static analyzer on library and replay sources | No diagnostics emitted; not a proof of correctness |
 | Tests-disabled CMake build | Library, replay and demo built with GCC warnings as errors |
 | Standalone C demo | `(2 + 3) * 4 = 20`; control 03bf, status 0000, tags ffff |
 
 Compiler warnings: `-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror`.
-CMake 3.31.6; Python 3.13.5. The new tooling uses Python 3.10+ syntax; that lower
-version itself was not tested. Windows/MSVC and non-x86 hosts were not tested.
+The initial Linux run did not test the minimum supported Python interpreter,
+Windows/MSVC or non-x86 hosts. Later hosted and Windows results are recorded below.
 
 ## Actual test output
 
@@ -40,9 +40,9 @@ numerical oracle, and model-only round trips are not independent hardware tests.
 stack wrap, environment transfers, initialization, BCD and integer conversions,
 original infinity behavior, controls, callback failure and known-gap guards.
 The all-encoding traversal is a decoder/safety smoke test, not an independent
-proof of each encoding's original behavior. Two previous guard assumptions were
-replaced by new supported-path assertions, so this count is slightly lower than
-0.1.0; substantially more checks are in the new regression suite.
+proof of each encoding's original behavior. The instruction suite checks
+supported paths and guards; broader original-specific checks are in the
+regression suite.
 
 **Original-specific regressions.** Raw/signed-zero FXTRACT across control modes;
 FPREM quotient history and sign combinations; zero-tag FSCALE, raw unnormal
@@ -53,7 +53,7 @@ mainly enumeration of integer FPREM cases and their previous condition bits.
 The expectations come from documentation/analysis, not physical captures.
 
 As a regression check, the new C regression executable was also linked against
-the original 0.1.0 library. It failed its first signed-zero FXTRACT check, while
+the earlier library. It failed its first signed-zero FXTRACT check, while
 the revised library passed. This demonstrates detection of a real change in
 behavior, not that all revised behavior is silicon-verified.
 
@@ -117,11 +117,11 @@ The jobs cover all six suites with GCC/Linux, Clang/Linux with ASan/UBSan, and
 MSVC/Windows, plus a tests-disabled build, demo and reproducible DOS collector
 assembly. Logs are retained as run artifacts.
 
-Local Windows runs also passed all six suites with MinGW GCC 15.2.0 and MSVC
-19.51.36260.0, using Python 3.14. CMake was 4.2.3. Warnings were errors; the
-replay and numerical test tools use a target-local Microsoft CRT setting to
+Local Windows runs also passed all six suites with MinGW GCC and MSVC, using
+Python and CMake. Warnings were errors; the replay and numerical test tools use
+a target-local Microsoft CRT setting to
 retain ISO C stdio. No original-hardware execution or non-x86 portability was
-established by these runs. The preceding 0.2.0 results remain historical records
+established by these runs. The preceding Linux results remain historical records
 of the imported package.
 
 ## Replay input integrity

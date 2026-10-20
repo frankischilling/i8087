@@ -61,7 +61,7 @@ the original PE/OE policy. The finite-bound interpretation also uses the
 recovered precision-adjustment and saturation ordering; a conflicting printed
 significand footnote is retained in the research record.
 
-## Original instruction and exception details used in 0.2.0
+## Original instruction and exception details
 
 The 1981 manual's FXTRACT description explicitly discusses signed-zero results
 and field extraction. The FPREM condition-code shift rule is also visible in

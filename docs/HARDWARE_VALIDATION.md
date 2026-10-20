@@ -8,7 +8,7 @@ executes one two-byte register-form instruction, waits, and saves the resulting
 94-byte state. A separate C tool replays the same inputs in this emulator, and
 Python compares the two outputs.
 
-The probe was assembled successfully with GNU binutils 2.44 and its instruction
+The probe was assembled successfully with GNU binutils and its instruction
 stream was inspected. It has NOT been run under DOS or on a real 8087 in this
 work. No CAPTURE.BIN or other file claimed as hardware output is supplied.
 
@@ -55,7 +55,7 @@ runtime, host floating point or external library is used by the probe.
 ## Collect on the physical target
 
 Copy CAPTURE.COM and the selected VECTORS.BIN into an otherwise disposable
-working directory on the original machine. DOS 3 or later is required for the
+working directory on the original machine. DOS must support the collector's
 create-new-file operation. Run:
 
 ```text
@@ -136,7 +136,7 @@ Without the explicit `--self-test` switch the comparator rejects a MODEL file
 as the reference. The Python writer cannot emit the HARDWARE marker. A self-test
 only proves tooling consistency, not agreement with an original processor.
 
-## Binary format, version 1
+## Binary format
 
 All integers are little-endian. Header size is 32 bytes:
 

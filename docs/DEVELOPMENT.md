@@ -8,9 +8,10 @@ addresses only part of them.
 
 CI runs the six existing suites with GCC on Linux, Clang with AddressSanitizer
 and UndefinedBehaviorSanitizer on Linux, and MSVC on Windows. Compiler warnings
-are errors. Python 3.10 checks the supported minimum; the other jobs use Python
-3.14. CI verifies test discovery so a missing Python interpreter cannot silently
-remove the independent numerical suites. Test reports are retained as artifacts.
+are errors. The GCC job checks the supported Python minimum; the other jobs use
+a current interpreter. CI verifies test discovery so a missing interpreter
+cannot silently remove the independent numerical suites. Test reports are
+retained as artifacts.
 The replay tool and numerical test driver retain ISO C stdio on MSVC through
 the target-local `_CRT_SECURE_NO_WARNINGS` setting; other warnings stay enabled.
 
@@ -38,7 +39,7 @@ works with Ninja. If copied source timestamps are ahead of the system clock,
 correct the timestamps or configure with `-DCMAKE_SUPPRESS_REGENERATION=ON`
 and explicitly rerun CMake after build configuration changes.
 
-The root `SHA256SUMS` records the imported 0.2.0 package. It is historical
+The root `SHA256SUMS` records the imported package. It is historical
 provenance, not a manifest for later commits. Git identifies current source
 revisions; hardware campaigns need their own hashes and machine metadata as
 described in [HARDWARE_VALIDATION.md](HARDWARE_VALIDATION.md).
