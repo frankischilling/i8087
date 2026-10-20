@@ -3,10 +3,11 @@
 """Parser/provenance round trips, NOT hardware-accuracy tests."""
 from pathlib import Path
 import subprocess
+import struct
 import sys
 import tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from trace_format import INPUT_MAGIC, MODEL_MAGIC, HARDWARE_MAGIC, HEADER, read_trace, write_trace
+from trace_format import INPUT_MAGIC, MODEL_MAGIC, HARDWARE_MAGIC, HEADER, outcome, read_trace, vector, write_trace
 from make_vectors import make_cases
 from compare_traces import compare
 
@@ -130,6 +131,39 @@ def main():
         # CHOP remains unresolved; generation must not hide its guarded results.
         assert sum(int.from_bytes(row[:2], "little") == 2 for row in rows) == 24
         assert sum(int.from_bytes(row[:2], "little") == 0 for row in rows) == 72
+        tests += 1
+        # Saved values are logical; the tag word rotates with TOP.
+        for top, expected_tags in ((0, 0xFFF4), (1, 0xFFD3), (7, 0x3FFD)):
+            raw = vector(0xD9, 0xE8, (0x3FFF, 1 << 63), (0, 0), sw=top << 11)
+            assert struct.unpack_from("<H", raw, 6)[0] == expected_tags
+            assert struct.unpack_from("<H", raw, 4)[0] == top << 11
+            tests += 1
+        constants, labels = make_cases("constants")
+        assert len(constants) == len(labels) == 2688
+        constant_src, constant_dst = directory / "constant-input.bin", directory / "constant-model.bin"
+        write_trace(constant_src, INPUT_MAGIC, constants)
+        subprocess.run([replay, str(constant_src), str(constant_dst)], check=True, capture_output=True)
+        passed = blocked = 0
+        for query, raw in zip(constants, read_trace(constant_dst).records):
+            result, gaps, sw, tags, registers = outcome(raw)
+            initial_sw, initial_tags = struct.unpack_from("<HH", query, 4)
+            top = (initial_sw >> 11) & 7
+            full, candidate = initial_tags == 0, query[1] not in (0xE8, 0xEE)
+            if full or candidate:
+                assert result == 2 and gaps == ((256 if full else 0) | (32 if candidate else 0))
+                assert raw[6:] == query[2:], "guarded constant load changed architectural state"
+                blocked += 1
+            else:
+                new_top = (top + 7) & 7
+                zero = query[1] == 0xEE
+                assert result == gaps == 0
+                assert registers[0] == ((0, 0) if zero else (0x3FFF, 1 << 63))
+                assert (sw >> 11) & 7 == new_top and sw & 0x3F == initial_sw & 0x3F
+                assert tags == ((0xFFFF & ~(3 << (2 * new_top))) | (int(zero) << (2 * new_top)))
+                old_registers = tuple((e, s) for s, e in struct.iter_unpack("<QH", query[16:]))
+                assert registers[1:] == old_registers[:7]
+                passed += 1
+        assert passed == 384 and blocked == 2304
         tests += 1
     print(f"PASS: {tests} trace-tool scenarios; {len(records)} smoke and {len(rounding)} FRNDINT model-only round trips; no hardware evidence")
 

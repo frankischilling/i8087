@@ -56,15 +56,15 @@ def tag(pair: tuple[int, int]) -> int:
 def vector(esc: int, modrm: int, a: tuple[int, int], b: tuple[int, int] | None = None,
            cw: int = 0x3BF, sw: int = 0, tags: int | None = None,
            other: tuple[tuple[int, int], ...] = ()) -> bytes:
-    """Create a TOP=0 vector; pairs use (sign/exponent, significand)."""
-    if sw & 0x3800:
-        raise ValueError("vector convenience builder requires TOP=0")
+    """Pairs use (sign/exponent, significand) in logical ST order; tags are physical."""
+    top = (sw >> 11) & 7
     values = [a] + ([b] if b is not None else []) + list(other)
     if len(values) > 8:
         raise ValueError("more than eight registers")
     derived = 0xFFFF
     for i, pair in enumerate(values):
-        derived = (derived & ~(3 << (2 * i))) | (tag(pair) << (2 * i))
+        physical = (top + i) & 7
+        derived = (derived & ~(3 << (2 * physical))) | (tag(pair) << (2 * physical))
     values += [(0, 0)] * (8 - len(values))
     image = struct.pack("<7H", cw, sw, derived if tags is None else tags, 0, 0, 0, 0)
     image += b"".join(struct.pack("<QH", sig, exp) for exp, sig in values)
