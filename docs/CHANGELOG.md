@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Use the requested C formatting with K&R braces and blank lines between
+  function and other definition blocks.
+- Preserve bounded PC64 unnormal-plus-zero add/subtract results without
+  normalizing their stored exponent and significand. Keep other unnormal
+  cases guarded and provide discriminating capture inputs.
 - Add GCC/Linux, Clang ASan/UBSan and MSVC/Windows CI, with required checks on
   `main`. Fix MSVC build diagnostics while retaining portable C stdio.
 - Preserve replay inputs and captures through exclusive output creation;

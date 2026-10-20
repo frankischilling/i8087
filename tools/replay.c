@@ -11,8 +11,7 @@ typedef struct image_bus {
     uint8_t bytes[94];
 } image_bus;
 
-static bool rd(void *ctx, uint32_t address, uint8_t *dst, size_t n)
-{
+static bool rd(void *ctx, uint32_t address, uint8_t *dst, size_t n) {
     image_bus *m = ctx;
     if (address != 0 || n > sizeof(m->bytes))
         return false;
@@ -20,8 +19,7 @@ static bool rd(void *ctx, uint32_t address, uint8_t *dst, size_t n)
     return true;
 }
 
-static bool wr(void *ctx, uint32_t address, const uint8_t *src, size_t n)
-{
+static bool wr(void *ctx, uint32_t address, const uint8_t *src, size_t n) {
     image_bus *m = ctx;
     if (address != 0 || n > sizeof(m->bytes))
         return false;
@@ -29,8 +27,7 @@ static bool wr(void *ctx, uint32_t address, const uint8_t *src, size_t n)
     return true;
 }
 
-static bool complete_payload(FILE *f, uint32_t count, unsigned size)
-{
+static bool complete_payload(FILE *f, uint32_t count, unsigned size) {
     long length;
     if (fseek(f, 0, SEEK_END))
         return false;
@@ -40,8 +37,7 @@ static bool complete_payload(FILE *f, uint32_t count, unsigned size)
     return fseek(f, (long)TRACE_HEADER_SIZE, SEEK_SET) == 0;
 }
 
-static bool header(FILE *f, uint8_t *h, const char *magic, unsigned size)
-{
+static bool header(FILE *f, uint8_t *h, const char *magic, unsigned size) {
     unsigned i;
     if (fread(h, 1, TRACE_HEADER_SIZE, f) != TRACE_HEADER_SIZE || memcmp(h, magic, 8) ||
         trace_u16(h + 12) != size || trace_u16(h + 14) || !trace_u32(h + 8) ||
@@ -53,8 +49,7 @@ static bool header(FILE *f, uint8_t *h, const char *magic, unsigned size)
     return complete_payload(f, trace_u32(h + 8), size);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     FILE *in = NULL, *out = NULL, *ref = NULL;
     uint8_t h[TRACE_HEADER_SIZE], record[TRACE_INPUT_SIZE], result[TRACE_OUTPUT_SIZE];
     uint32_t count, i, ip, blocked = 0, pending = 0;

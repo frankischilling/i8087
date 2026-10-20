@@ -117,12 +117,26 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
             for i in range(8):
                 add(f"Intel Table A-2 {esc:02x} {base+i:02x} {name} ST({i})", esc, base+i,
                     integer(1), integer(2), other=tuple(integer(k) for k in range(3, 9)))
+    if suite in ("unnormal-zero", "all"):
+        payloads = ((0x4000, J >> 1), (0x4000, 1), (0x0041, 1), (0x7FFD, (J >> 1) + 1))
+        for exponent, significand in payloads:
+            for sign in range(2):
+                for zero_sign in range(2):
+                    for which in range(2):
+                        x, zero = (exponent | sign << 15, significand), (zero_sign << 15, 0)
+                        a, b = (zero, x) if which else (x, zero)
+                        for name, opcode in (("FADD", 0xC1), ("FSUB", 0xE1), ("FSUBR", 0xE9)):
+                            for rc in range(4):
+                                for top in range(8):
+                                    add(f"{name} unnormal+zero raw={x} side={which} zeroSign={zero_sign} rc={rc} top={top}",
+                                        0xD8, opcode, a, b, cw=0x03BF | rc << 10,
+                                        sw=top << 11 | 0x4700)
     return records, names
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "constants", "encodings", "all"), default="smoke")
+    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "constants", "encodings", "unnormal-zero", "all"), default="smoke")
     args = parser.parse_args()
     try:
         args.output.mkdir(parents=True, exist_ok=False)

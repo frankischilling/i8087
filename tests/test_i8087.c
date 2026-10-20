@@ -19,8 +19,7 @@ static uint8_t memory[1u << 20];
 static bool fail_read, fail_write;
 static unsigned writes;
 
-static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n)
-{
+static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n) {
     size_t i;
     (void)ctx;
     if (fail_read)
@@ -30,8 +29,7 @@ static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n)
     return true;
 }
 
-static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t n)
-{
+static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t n) {
     size_t i;
     (void)ctx;
     if (fail_write)
@@ -44,8 +42,7 @@ static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t 
 
 static const i8087_bus bus = {NULL, read_memory, write_memory};
 
-static void put(uint32_t address, uint64_t v, size_t n)
-{
+static void put(uint32_t address, uint64_t v, size_t n) {
     size_t i;
     for (i = 0; i < n; ++i) {
         memory[(address + (uint32_t)i) & 0xfffff] = (uint8_t)v;
@@ -53,8 +50,7 @@ static void put(uint32_t address, uint64_t v, size_t n)
     }
 }
 
-static uint64_t get(uint32_t address, size_t n)
-{
+static uint64_t get(uint32_t address, size_t n) {
     uint64_t v = 0;
     size_t i;
     for (i = 0; i < n; ++i)
@@ -62,47 +58,39 @@ static uint64_t get(uint32_t address, size_t n)
     return v;
 }
 
-static i8087_result exec(i8087 *f, uint8_t esc, uint8_t m, uint32_t ea)
-{
+static i8087_result exec(i8087 *f, uint8_t esc, uint8_t m, uint32_t ea) {
     return i8087_execute(f, &bus, esc, m, 0xabcde, ea);
 }
 
-static void ok(i8087 *f, uint8_t esc, uint8_t m, uint32_t ea)
-{
+static void ok(i8087 *f, uint8_t esc, uint8_t m, uint32_t ea) {
     CHECK(exec(f, esc, m, ea) == I8087_OK);
 }
 
-static bool equal(i8087_f80 a, i8087_f80 b)
-{
+static bool equal(i8087_f80 a, i8087_f80 b) {
     return a.significand == b.significand && a.sign_exponent == b.sign_exponent;
 }
 
-static i8087_f80 st(const i8087 *f, unsigned i)
-{
+static i8087_f80 st(const i8087 *f, unsigned i) {
     i8087_f80 x;
     CHECK(i8087_get_st(f, i, &x));
     return x;
 }
 
-static void load80(i8087 *f, i8087_f80 x)
-{
+static void load80(i8087 *f, i8087_f80 x) {
     i8087_encode_f80(memory + 0x100, x);
     ok(f, 0xdb, 0x2e, 0x100);
 }
 
-static void loadint(i8087 *f, int64_t n)
-{
+static void loadint(i8087 *f, int64_t n) {
     put(0x100, (uint64_t)n, 8);
     ok(f, 0xdf, 0x2e, 0x100);
 }
 
-static void expectint(const i8087 *f, unsigned i, int64_t n)
-{
+static void expectint(const i8087 *f, unsigned i, int64_t n) {
     CHECK(equal(st(f, i), sf_from_signed_bits((uint64_t)n, 64)));
 }
 
-static bool same_arch(const i8087 *a, const i8087 *b)
-{
+static bool same_arch(const i8087 *a, const i8087 *b) {
     unsigned i;
     if (a->control != b->control || a->status != b->status || a->tags != b->tags ||
         a->opcode != b->opcode || a->instruction_address != b->instruction_address ||
@@ -114,8 +102,7 @@ static bool same_arch(const i8087 *a, const i8087 *b)
     return true;
 }
 
-static void test_basics(void)
-{
+static void test_basics(void) {
     i8087 f, other;
     unsigned i;
     i8087_init(&f);
@@ -172,8 +159,7 @@ static void test_basics(void)
     expectint(&f, 1, 9);
 }
 
-static void test_arithmetic_order(void)
-{
+static void test_arithmetic_order(void) {
     const struct {
         uint8_t esc, m;
         int64_t want;
@@ -222,8 +208,7 @@ static void test_arithmetic_order(void)
     expectint(&f, 0, 10);
 }
 
-static void test_numeric_ops(void)
-{
+static void test_numeric_ops(void) {
     i8087 f;
     unsigned rc;
     for (rc = 0; rc < 4; ++rc) {
@@ -262,8 +247,7 @@ static void test_numeric_ops(void)
     CHECK(!f.used_approximations);
 }
 
-static void test_transcendental_guards(void)
-{
+static void test_transcendental_guards(void) {
     i8087 f, saved;
     unsigned i;
     const uint8_t opcodes[] = {0xf0, 0xf1, 0xf2, 0xf3, 0xf9};
@@ -304,8 +288,7 @@ static void test_transcendental_guards(void)
     CHECK(f.last_gap & I8087_GAP_UNDEFINED_OPERAND);
 }
 
-static void test_specials(void)
-{
+static void test_specials(void) {
     i8087 f;
     const i8087_f80 inf = {UINT64_C(0x8000000000000000), 0x7fff};
     const i8087_f80 nan = {UINT64_C(0xc123456789abcdef), 0x7fff};
@@ -367,8 +350,7 @@ static void test_specials(void)
     CHECK((f.status & 0x4700) == 0x4200);
 }
 
-static void test_memory_and_unnormals(void)
-{
+static void test_memory_and_unnormals(void) {
     i8087 f;
     const i8087_f80 raw = {UINT64_C(0x123456789abcdef0), 0x3456};
     i8087_init(&f);
@@ -409,8 +391,7 @@ static void test_memory_and_unnormals(void)
     CHECK(get(0xffff, 4) == 0x12345678); /* Does not wrap at 64 KiB. */
 }
 
-static void test_bcd(void)
-{
+static void test_bcd(void) {
     i8087 f;
     unsigned i;
     i8087_init(&f);
@@ -432,8 +413,7 @@ static void test_bcd(void)
     CHECK(f.last_gap & I8087_GAP_UNDEFINED_OPERAND);
 }
 
-static void test_environments(void)
-{
+static void test_environments(void) {
     i8087 f, before;
     unsigned i;
     uint16_t cw;
@@ -474,8 +454,7 @@ static void test_environments(void)
     CHECK(f.control == 0x1bbf);
 }
 
-static void test_interrupts(void)
-{
+static void test_interrupts(void) {
     i8087 f, before;
     i8087_init(&f);
     loadint(&f, 0);
@@ -509,8 +488,7 @@ static void test_interrupts(void)
     expectint(&f, 0, 40000);
 }
 
-static void test_failure_atomicity(void)
-{
+static void test_failure_atomicity(void) {
     i8087 f, before;
     unsigned old_writes;
     i8087_init(&f);
@@ -538,8 +516,7 @@ static void test_failure_atomicity(void)
     CHECK(same_arch(&f, &before));
 }
 
-static void test_decoder_smoke(void)
-{
+static void test_decoder_smoke(void) {
     unsigned esc, m, i;
     i8087 f;
     for (esc = 0xd8; esc <= 0xdf; ++esc)
@@ -556,8 +533,7 @@ static void test_decoder_smoke(void)
         }
 }
 
-int main(void)
-{
+int main(void) {
     test_basics();
     test_arithmetic_order();
     test_numeric_ops();

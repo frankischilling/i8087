@@ -78,6 +78,11 @@ significand footnote is retained in the research record.
 
 ## Original instruction and exception details
 
+The [unnormal-plus-zero investigation](research/UNNORMAL_ZERO_ARITHMETIC.md)
+combines Intel's normalization rule with the decoded alignment and precision
+paths. It supports a bounded PC64 result that retains the unnormal exponent
+and significand; it does not establish general unnormal arithmetic.
+
 Table A-2, printed S-112 through S-114, explicitly assigns operations to nine
 register encoding groups that Intel's translators do not emit. The decoder
 accepts these 72 forms. [The encoding investigation](research/ALTERNATE_ENCODINGS.md)

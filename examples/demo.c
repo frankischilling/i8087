@@ -5,8 +5,7 @@
 
 static uint8_t memory[1024];
 
-static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n)
-{
+static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n) {
     (void)ctx;
     if (address > sizeof(memory) || n > sizeof(memory) - address)
         return false;
@@ -14,8 +13,7 @@ static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n)
     return true;
 }
 
-static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t n)
-{
+static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t n) {
     (void)ctx;
     if (address > sizeof(memory) || n > sizeof(memory) - address)
         return false;
@@ -23,8 +21,7 @@ static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t 
     return true;
 }
 
-int main(void)
-{
+int main(void) {
     i8087 fpu;
     i8087_bus bus = {NULL, read_memory, write_memory};
 

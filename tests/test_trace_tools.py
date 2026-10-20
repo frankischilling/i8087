@@ -241,6 +241,26 @@ def main():
             assert subprocess.run([replay, str(src), str(directory / f"reserved-{esc}-{modrm}.bin")],
                                   capture_output=True).returncode != 0
             tests += 1
+        unnormal, labels = make_cases("unnormal-zero")
+        assert len(unnormal) == len(labels) == 3072
+        unnormal_src, unnormal_dst = directory / "unnormal-input.bin", directory / "unnormal-model.bin"
+        write_trace(unnormal_src, INPUT_MAGIC, unnormal)
+        subprocess.run([replay, str(unnormal_src), str(unnormal_dst)], check=True, capture_output=True)
+        for query, raw in zip(unnormal, read_trace(unnormal_dst).records):
+            result, gaps, sw, tags, registers = outcome(raw)
+            assert result == gaps == 0
+            initial_sw, initial_tags = struct.unpack_from("<HH", query, 4)
+            top = (initial_sw >> 11) & 7
+            old = tuple((e, s) for s, e in struct.iter_unpack("<QH", query[16:]))
+            zero_first = old[0][1] == 0
+            exponent, significand = old[int(zero_first)]
+            if (query[1] == 0xE1 and zero_first) or (query[1] == 0xE9 and not zero_first):
+                exponent ^= 0x8000
+            assert registers[0] == (exponent, significand)
+            assert registers[1:] == old[1:]
+            assert sw == initial_sw & ~0x200
+            assert tags == initial_tags & ~(3 << (2 * top))
+        tests += 1
     print(f"PASS: {tests} trace-tool scenarios; {len(records)} smoke and {len(rounding)} FRNDINT model-only round trips; no hardware evidence")
 
 if __name__ == "__main__":

@@ -6,8 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int main(void)
-{
+int main(void) {
     char line[256], op[16];
     unsigned p, rc, ae, be;
     uint64_t as, bs;

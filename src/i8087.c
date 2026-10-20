@@ -20,13 +20,11 @@ typedef struct transaction {
     bool register_range_result;
 } transaction;
 
-static uint16_t get16(const uint8_t *p)
-{
+static uint16_t get16(const uint8_t *p) {
     return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
 }
 
-static uint64_t get_le(const uint8_t *p, size_t n)
-{
+static uint64_t get_le(const uint8_t *p, size_t n) {
     uint64_t r = 0;
     size_t i;
     for (i = 0; i < n; ++i)
@@ -34,8 +32,7 @@ static uint64_t get_le(const uint8_t *p, size_t n)
     return r;
 }
 
-static void put_le(uint8_t *p, uint64_t x, size_t n)
-{
+static void put_le(uint8_t *p, uint64_t x, size_t n) {
     size_t i;
     for (i = 0; i < n; ++i) {
         p[i] = (uint8_t)x;
@@ -43,16 +40,14 @@ static void put_le(uint8_t *p, uint64_t x, size_t n)
     }
 }
 
-void i8087_encode_f80(uint8_t p[10], i8087_f80 x)
-{
+void i8087_encode_f80(uint8_t p[10], i8087_f80 x) {
     if (!p)
         return;
     put_le(p, x.significand, 8);
     put_le(p + 8, x.sign_exponent, 2);
 }
 
-i8087_f80 i8087_decode_f80(const uint8_t p[10])
-{
+i8087_f80 i8087_decode_f80(const uint8_t p[10]) {
     i8087_f80 x = {0, 0};
     if (p) {
         x.significand = get_le(p, 8);
@@ -61,41 +56,34 @@ i8087_f80 i8087_decode_f80(const uint8_t p[10])
     return x;
 }
 
-unsigned i8087_top(const i8087 *f)
-{
+unsigned i8087_top(const i8087 *f) {
     return f ? (unsigned)((f->status >> 11) & 7) : 0;
 }
 
-static unsigned physical(const i8087 *f, unsigned i)
-{
+static unsigned physical(const i8087 *f, unsigned i) {
     return (i8087_top(f) + i) & 7;
 }
 
-unsigned i8087_tag(const i8087 *f, unsigned i)
-{
+unsigned i8087_tag(const i8087 *f, unsigned i) {
     return f && i < 8 ? (unsigned)((f->tags >> (physical(f, i) * 2)) & 3) : I8087_TAG_EMPTY;
 }
 
-bool i8087_get_st(const i8087 *f, unsigned i, i8087_f80 *x)
-{
+bool i8087_get_st(const i8087 *f, unsigned i, i8087_f80 *x) {
     if (!f || !x || i >= 8 || i8087_tag(f, i) == I8087_TAG_EMPTY)
         return false;
     *x = f->registers[physical(f, i)];
     return true;
 }
 
-static void set_top(i8087 *f, unsigned top)
-{
+static void set_top(i8087 *f, unsigned top) {
     f->status = (uint16_t)((f->status & (uint16_t)~I8087_TOP) | ((top & 7u) << 11));
 }
 
-static void set_tag(i8087 *f, unsigned p, unsigned tag)
-{
+static void set_tag(i8087 *f, unsigned p, unsigned tag) {
     f->tags = (uint16_t)((f->tags & ~(3u << (2 * p))) | ((tag & 3) << (2 * p)));
 }
 
-static void set_st(i8087 *f, unsigned i, i8087_f80 x)
-{
+static void set_st(i8087 *f, unsigned i, i8087_f80 x) {
     unsigned p = physical(f, i);
     f->registers[p] = x;
     set_tag(f, p, sf_tag(x));
@@ -104,21 +92,18 @@ static void set_st(i8087 *f, unsigned i, i8087_f80 x)
 /* IR is an exception-event latch, not a combinational function of the six
    sticky status flags and the CURRENT masks. FLDCW must not retroactively
    turn an old masked exception into a new interrupt. */
-static void synchronize_busy(i8087 *f)
-{
+static void synchronize_busy(i8087 *f) {
     if (f->status & I8087_IR)
         f->status |= I8087_BUSY;
     else
         f->status &= (uint16_t)~I8087_BUSY;
 }
 
-bool i8087_interrupt_asserted(const i8087 *f)
-{
+bool i8087_interrupt_asserted(const i8087 *f) {
     return f && (f->status & I8087_IR) && (!(f->control & I8087_INTERRUPT_MASK) || f->cpu_waiting);
 }
 
-i8087_result i8087_wait(i8087 *f)
-{
+i8087_result i8087_wait(i8087 *f) {
     if (!f)
         return I8087_BAD_ARGUMENT;
     f->cpu_waiting = true;
@@ -128,8 +113,7 @@ i8087_result i8087_wait(i8087 *f)
     return I8087_OK;
 }
 
-static void software_init(i8087 *f)
-{
+static void software_init(i8087 *f) {
     /* Reserved bit 6 is deterministically zero. CC bits are unspecified by
        the original manual; retaining them also avoids inventing a reset value. */
     f->control = 0x03bf;
@@ -138,8 +122,7 @@ static void software_init(i8087 *f)
     f->cpu_waiting = false;
 }
 
-void i8087_init(i8087 *f)
-{
+void i8087_init(i8087 *f) {
     if (!f)
         return;
     memset(f, 0, sizeof(*f));
@@ -147,19 +130,16 @@ void i8087_init(i8087 *f)
     software_init(f);
 }
 
-void i8087_set_policy(i8087 *f, i8087_policy p)
-{
+void i8087_set_policy(i8087 *f, i8087_policy p) {
     if (f && (p == I8087_STOP_ON_UNVERIFIED || p == I8087_ALLOW_APPROXIMATION))
         f->policy = p;
 }
 
-static void gap(transaction *t, uint32_t why)
-{
+static void gap(transaction *t, uint32_t why) {
     t->f.last_gap |= why;
 }
 
-static i8087_f80 read_st(transaction *t, unsigned i)
-{
+static i8087_f80 read_st(transaction *t, unsigned i) {
     i8087_f80 x;
     if (i8087_get_st(&t->f, i, &x))
         return x;
@@ -169,8 +149,7 @@ static i8087_f80 read_st(transaction *t, unsigned i)
     return sf_indefinite();
 }
 
-static void push_tagged(transaction *t, i8087_f80 x, unsigned tag)
-{
+static void push_tagged(transaction *t, i8087_f80 x, unsigned tag) {
     unsigned p = (i8087_top(&t->f) + 7) & 7;
     if (((t->f.tags >> (2 * p)) & 3) != I8087_TAG_EMPTY) {
         gap(t, I8087_GAP_STACK_FAULT);
@@ -184,45 +163,38 @@ static void push_tagged(transaction *t, i8087_f80 x, unsigned tag)
     set_tag(&t->f, p, tag);
 }
 
-static void push(transaction *t, i8087_f80 x)
-{
+static void push(transaction *t, i8087_f80 x) {
     push_tagged(t, x, sf_tag(x));
 }
 
-static unsigned read_tag(const transaction *t, unsigned i)
-{
+static unsigned read_tag(const transaction *t, unsigned i) {
     unsigned tag = i8087_tag(&t->f, i);
     return tag == I8087_TAG_EMPTY ? I8087_TAG_SPECIAL : tag;
 }
 
-static void write_tagged(i8087 *f, unsigned i, i8087_f80 x, unsigned tag)
-{
+static void write_tagged(i8087 *f, unsigned i, i8087_f80 x, unsigned tag) {
     unsigned p = physical(f, i);
     f->registers[p] = x;
     set_tag(f, p, tag);
 }
 
-static void pop(transaction *t)
-{
+static void pop(transaction *t) {
     set_tag(&t->f, i8087_top(&t->f), I8087_TAG_EMPTY);
     set_top(&t->f, (i8087_top(&t->f) + 1) & 7);
 }
 
-static unsigned precision(transaction *t)
-{
+static unsigned precision(transaction *t) {
     unsigned pc = (t->f.control >> 8) & 3;
     if (pc == 1)
         gap(t, I8087_GAP_RESERVED_PRECISION);
     return pc == 0 ? 24 : (pc == 2 ? 53 : 64);
 }
 
-static unsigned rounding(const transaction *t)
-{
+static unsigned rounding(const transaction *t) {
     return (t->f.control >> 10) & 3;
 }
 
-static void accept_numeric(transaction *t, sf_result *r)
-{
+static void accept_numeric(transaction *t, sf_result *r) {
     sf_unbounded *u = &r->unbounded;
     uint16_t range = 0;
     if (u->valid) {
@@ -278,14 +250,12 @@ static void accept_numeric(transaction *t, sf_result *r)
     t->f.status = (uint16_t)((t->f.status & ~I8087_C1) | (r->rounded_up ? I8087_C1 : 0));
 }
 
-static void check_denormal(transaction *t, i8087_f80 x)
-{
+static void check_denormal(transaction *t, i8087_f80 x) {
     if (sf_denormal(x))
         t->raised |= I8087_DE;
 }
 
-static void compare(transaction *t, i8087_f80 a, i8087_f80 b, unsigned pops)
-{
+static void compare(transaction *t, i8087_f80 a, i8087_f80 b, unsigned pops) {
     int relation;
     t->compare_operation = true;
     check_denormal(t, a);
@@ -310,17 +280,43 @@ static void compare(transaction *t, i8087_f80 a, i8087_f80 b, unsigned pops)
         pop(t);
 }
 
+static bool unnormal_plus_zero(const transaction *t, i8087_f80 a, i8087_f80 b, unsigned a_tag,
+                               unsigned b_tag, sf_result *out) {
+    i8087_f80 raw;
+    unsigned exponent;
+    if (((t->f.control >> 8) & 3) != 3 || (t->raised & I8087_DE))
+        return false;
+    if (a_tag == I8087_TAG_ZERO && !a.significand && !(a.sign_exponent & 0x7fff) &&
+        b_tag == I8087_TAG_VALID)
+        raw = b;
+    else if (b_tag == I8087_TAG_ZERO && !b.significand && !(b.sign_exponent & 0x7fff) &&
+             a_tag == I8087_TAG_VALID)
+        raw = a;
+    else
+        return false;
+    exponent = raw.sign_exponent & 0x7fff;
+    if (!sf_unnormal(raw) || !raw.significand || exponent < 0x0041 || exponent > 0x7ffd)
+        return false;
+    /* J2 aligns only zero bits and skips normalization. At PC64, J11 has
+       no discarded bits to round. Keep the stored exponent and significand.
+       See research/UNNORMAL_ZERO_ARITHMETIC.md for the bounded source path. */
+    *out = (sf_result){raw, 0, false, {0}};
+    return true;
+}
+
 static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_f80 a, i8087_f80 b,
-                       bool do_pop)
-{
+                       unsigned a_tag, unsigned b_tag, bool do_pop) {
     sf_result r;
     unsigned p = precision(t), rc = rounding(t);
     check_denormal(t, a);
     check_denormal(t, b);
     if (operation == 5 || operation == 7) {
         i8087_f80 tmp = a;
+        unsigned tag = a_tag;
         a = b;
         b = tmp;
+        a_tag = b_tag;
+        b_tag = tag;
     }
     /* Propagate NaN bytes BEFORE subtraction negates an arithmetic operand.
        The sign of a selected NaN is not a subtraction sign adjustment. */
@@ -332,7 +328,7 @@ static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_
         if (sf_kind(a) == SF_INFINITY && sf_kind(b) == SF_INFINITY &&
             !(t->f.control & I8087_AFFINE))
             r = (sf_result){sf_indefinite(), I8087_IE, false, {0}};
-        else {
+        else if (!unnormal_plus_zero(t, a, b, a_tag, b_tag, &r)) {
             if (sf_unnormal(a) || sf_unnormal(b) || sf_denormal(a) || sf_denormal(b))
                 gap(t, I8087_GAP_UNNORMAL);
             r = sf_add(a, b, p, rc);
@@ -356,8 +352,7 @@ static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_
         pop(t);
 }
 
-static void examine(transaction *t)
-{
+static void examine(transaction *t) {
     i8087_f80 x = t->f.registers[i8087_top(&t->f)];
     uint16_t cc = sf_sign(x) ? I8087_C1 : 0;
     if (i8087_tag(&t->f, 0) == I8087_TAG_EMPTY)
@@ -376,8 +371,7 @@ static void examine(transaction *t)
     t->f.status = (uint16_t)((t->f.status & ~CC) | cc);
 }
 
-static void encode_env(const i8087 *f, uint8_t *p)
-{
+static void encode_env(const i8087 *f, uint8_t *p) {
     put_le(p, f->control, 2);
     put_le(p + 2, f->status, 2);
     put_le(p + 4, f->tags, 2);
@@ -387,8 +381,7 @@ static void encode_env(const i8087 *f, uint8_t *p)
     put_le(p + 12, (f->data_address >> 4) & 0xf000, 2);
 }
 
-static void decode_env(i8087 *f, const uint8_t *p)
-{
+static void decode_env(i8087 *f, const uint8_t *p) {
     f->control = (uint16_t)(get16(p) & 0x1fbf);
     f->status = (uint16_t)(get16(p + 2) & 0xffbf);
     f->tags = get16(p + 4);
@@ -398,8 +391,7 @@ static void decode_env(i8087 *f, const uint8_t *p)
     synchronize_busy(f);
 }
 
-static void load_bcd(transaction *t, const uint8_t *p)
-{
+static void load_bcd(transaction *t, const uint8_t *p) {
     uint64_t v = 0;
     int i;
     bool bad = false;
@@ -417,8 +409,7 @@ static void load_bcd(transaction *t, const uint8_t *p)
     push(t, sf_from_u64(v, (p[9] & 0x80) != 0));
 }
 
-static void store_bcd(transaction *t, i8087_f80 x)
-{
+static void store_bcd(transaction *t, i8087_f80 x) {
     uint16_t flags = 0;
     bool up = false;
     uint64_t bits, mag;
@@ -450,8 +441,7 @@ static void store_bcd(transaction *t, i8087_f80 x)
     pop(t);
 }
 
-static void store_ieee(transaction *t, i8087_f80 x, unsigned width, bool do_pop)
-{
+static void store_ieee(transaction *t, i8087_f80 x, unsigned width, bool do_pop) {
     uint16_t flags = 0;
     bool up = false;
     uint64_t bits;
@@ -491,8 +481,7 @@ static void store_ieee(transaction *t, i8087_f80 x, unsigned width, bool do_pop)
         pop(t);
 }
 
-static void store_integer(transaction *t, i8087_f80 x, unsigned width, bool do_pop)
-{
+static void store_integer(transaction *t, i8087_f80 x, unsigned width, bool do_pop) {
     uint16_t flags = 0;
     bool up = false;
     uint64_t bits;
@@ -510,8 +499,7 @@ static void store_integer(transaction *t, i8087_f80 x, unsigned width, bool do_p
 }
 
 /* Valid documented memory encodings; newer x87 extensions are not accepted. */
-static size_t memory_read_size(uint8_t esc, unsigned reg, bool *valid, bool *control)
-{
+static size_t memory_read_size(uint8_t esc, unsigned reg, bool *valid, bool *control) {
     *valid = true;
     *control = false;
     if (!(esc & 1))
@@ -594,8 +582,7 @@ static size_t memory_read_size(uint8_t esc, unsigned reg, bool *valid, bool *con
     return 0;
 }
 
-static i8087_result memory_instruction(transaction *t, uint8_t esc, unsigned reg)
-{
+static i8087_result memory_instruction(transaction *t, uint8_t esc, unsigned reg) {
     i8087_f80 x;
     unsigned i, width;
     if (!(esc & 1)) {
@@ -607,7 +594,7 @@ static i8087_result memory_instruction(transaction *t, uint8_t esc, unsigned reg
         if (reg == 2 || reg == 3)
             compare(t, read_st(t, 0), x, reg == 3 ? 1 : 0);
         else
-            arithmetic(t, reg, 0, read_st(t, 0), x, false);
+            arithmetic(t, reg, 0, read_st(t, 0), x, read_tag(t, 0), sf_tag(x), false);
         return I8087_OK;
     }
     if (esc == 0xd9) {
@@ -714,8 +701,7 @@ static i8087_result memory_instruction(transaction *t, uint8_t esc, unsigned reg
     return I8087_OK;
 }
 
-static void extract(transaction *t)
-{
+static void extract(transaction *t) {
     i8087_f80 x = read_st(t, 0), exponent, significand = x;
     enum sf_kind k = sf_kind(x);
     if (k == SF_INFINITY || k == SF_NAN) {
@@ -738,8 +724,7 @@ static void extract(transaction *t)
     push(t, significand);
 }
 
-static void remainder_instruction(transaction *t)
-{
+static void remainder_instruction(transaction *t) {
     i8087_f80 a = read_st(t, 0), b = read_st(t, 1), r;
     uint8_t q = 0;
     bool partial = false;
@@ -786,8 +771,7 @@ static void remainder_instruction(transaction *t)
     set_st(&t->f, 0, r);
 }
 
-static void scale_instruction(transaction *t)
-{
+static void scale_instruction(transaction *t) {
     i8087_f80 x, y;
     uint16_t flags = 0;
     bool up = false;
@@ -847,8 +831,7 @@ static void scale_instruction(transaction *t)
     set_st(&t->f, 0, r.value);
 }
 
-static i8087_result special_instruction(transaction *t, uint8_t m)
-{
+static i8087_result special_instruction(transaction *t, uint8_t m) {
     static const i8087_f80 constants[7] = {{UINT64_C(0x8000000000000000), 0x3fff},
                                            {UINT64_C(0xd49a784bcd1b8afe), 0x4000},
                                            {UINT64_C(0xb8aa3b295c17f0bc), 0x3fff},
@@ -963,8 +946,7 @@ static i8087_result special_instruction(transaction *t, uint8_t m)
     return I8087_OK;
 }
 
-static bool valid_register(uint8_t esc, uint8_t m)
-{
+static bool valid_register(uint8_t esc, uint8_t m) {
     unsigned group = (m >> 3) & 7;
     switch (esc) {
         case 0xd8:
@@ -987,8 +969,7 @@ static bool valid_register(uint8_t esc, uint8_t m)
     }
 }
 
-static i8087_result register_instruction(transaction *t, uint8_t esc, uint8_t m)
-{
+static i8087_result register_instruction(transaction *t, uint8_t esc, uint8_t m) {
     unsigned group = (m >> 3) & 7, i = m & 7, op = group;
     i8087_f80 a, b;
     /* Table A-2, S-112..S-114 lists these translator-unused encodings.
@@ -1071,19 +1052,18 @@ static i8087_result register_instruction(transaction *t, uint8_t esc, uint8_t m)
         if (group == 2 || group == 3)
             compare(t, a, b, group == 3 ? 1 : 0);
         else
-            arithmetic(t, op, 0, a, b, false);
+            arithmetic(t, op, 0, a, b, read_tag(t, 0), read_tag(t, i), false);
     } else {
         /* DC/DE reverse the subtraction/division encodings relative to D8. */
         if (group >= 4)
             op = group ^ 1u;
-        arithmetic(t, op, i, b, a, esc == 0xde);
+        arithmetic(t, op, i, b, a, read_tag(t, i), read_tag(t, 0), esc == 0xde);
     }
     return I8087_OK;
 }
 
 i8087_result i8087_execute(i8087 *f, const i8087_bus *bus, uint8_t esc, uint8_t m, uint32_t ip,
-                           uint32_t ea)
-{
+                           uint32_t ea) {
     transaction t;
     bool memory = m < 0xc0, valid = true, control = false;
     size_t n = 0;
@@ -1175,8 +1155,7 @@ i8087_result i8087_execute(i8087 *f, const i8087_bus *bus, uint8_t esc, uint8_t 
     return unmasked ? I8087_PENDING_INTERRUPT : I8087_OK;
 }
 
-const char *i8087_result_string(i8087_result r)
-{
+const char *i8087_result_string(i8087_result r) {
     switch (r) {
         case I8087_OK:
             return "ok";

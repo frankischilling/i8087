@@ -9,8 +9,7 @@
 static uint64_t rng = UINT64_C(0x8087198020260200);
 static unsigned current_case;
 
-static uint64_t random64(void)
-{
+static uint64_t random64(void) {
     uint64_t x = rng;
     x ^= x << 13;
     x ^= x >> 7;
@@ -33,8 +32,7 @@ typedef struct memory {
     bool fail_read, fail_write;
 } memory;
 
-static bool rd(void *ctx, uint32_t a, uint8_t *p, size_t n)
-{
+static bool rd(void *ctx, uint32_t a, uint8_t *p, size_t n) {
     memory *m = ctx;
     size_t i;
     ++m->reads;
@@ -46,8 +44,7 @@ static bool rd(void *ctx, uint32_t a, uint8_t *p, size_t n)
     return true;
 }
 
-static bool wr(void *ctx, uint32_t a, const uint8_t *p, size_t n)
-{
+static bool wr(void *ctx, uint32_t a, const uint8_t *p, size_t n) {
     memory *m = ctx;
     size_t i;
     CHECK(a <= 0xfffff && n <= 94);
@@ -59,8 +56,7 @@ static bool wr(void *ctx, uint32_t a, const uint8_t *p, size_t n)
     return true;
 }
 
-static bool same(const i8087 *a, const i8087 *b, bool omit_gap)
-{
+static bool same(const i8087 *a, const i8087 *b, bool omit_gap) {
     unsigned i;
     for (i = 0; i < 8; ++i)
         if (a->registers[i].significand != b->registers[i].significand ||
@@ -73,8 +69,7 @@ static bool same(const i8087 *a, const i8087 *b, bool omit_gap)
            a->used_approximations == b->used_approximations && a->cpu_waiting == b->cpu_waiting;
 }
 
-static void seed(i8087 *f)
-{
+static void seed(i8087 *f) {
     static const uint16_t exps[] = {0,      1,      2,      0x3fbe, 0x3fbf, 0x3ffe,
                                     0x3fff, 0x4000, 0x7ffd, 0x7ffe, 0x7fff};
     unsigned i;
@@ -111,8 +106,7 @@ static void seed(i8087 *f)
     }
 }
 
-int main(void)
-{
+int main(void) {
     unsigned outcomes[6] = {0};
     for (current_case = 0; current_case < CASES; ++current_case) {
         i8087 before, a, b;

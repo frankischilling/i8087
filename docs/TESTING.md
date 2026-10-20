@@ -101,9 +101,9 @@ sh tools/hardware/build.sh
 
 ## C formatting
 
-The repository's `.clang-format` defines the C style, including a blank line
-between function and other definition blocks. Apply it to tracked sources
-and headers from the source root:
+The repository's `.clang-format` defines the C style: K&R braces and a blank
+line between function and other definition blocks. Apply it to tracked
+sources and headers from the source root:
 
 ```sh
 git ls-files -z -- '*.c' '*.h' | xargs -0 clang-format -i
@@ -248,3 +248,20 @@ or on an original 8087; none of these tests supplies physical evidence.
 All six suites passed locally with GCC and MSVC on Windows and Clang with
 ASan/UBSan under Linux for this change. Hosted checks are still required
 before merging the pull request.
+
+## Bounded unnormal-plus-zero arithmetic
+
+The instruction suite adds 774,144 register cases across nine add/subtract
+forms, all destination indices, TOP, operand order, both signs, RC, masks,
+sticky flags and both gap policies. Literal raw expectations distinguish
+preserved unnormal storage from a normalized value. Another 192 cases check
+zero memory operands in short/long real and integer formats. Denormal memory
+loads retain their masked guard or unmasked before-operation DE response.
+Negative cases retain guards for reduced/reserved PC, pseudozeros, inconsistent
+tags and excluded exponent edges.
+
+The first new acceptance check failed before the correction. The model-only
+capture campaign adds 3,072 masked register inputs and checks raw result,
+tags, C1 and untouched storage. None of these files contains original execution
+results. [The investigation](research/UNNORMAL_ZERO_ARITHMETIC.md) explains the
+bounded J2 alignment, normalization and precision path.
