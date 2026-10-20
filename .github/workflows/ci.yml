@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-gcc
+            os: ubuntu-24.04
+            compiler: gcc
+            python: '3.10'
+            build_type: Release
+            sanitize: 'OFF'
+          - name: linux-clang-sanitize
+            os: ubuntu-24.04
+            compiler: clang
+            python: '3.14'
+            build_type: Debug
+            sanitize: 'ON'
+          - name: windows-msvc
+            os: windows-2022
+            python: '3.14'
+            build_type: Release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Configure Linux
+        if: runner.os == 'Linux'
+        run: >-
+          cmake -S . -B build -DCMAKE_C_COMPILER=${{ matrix.compiler }}
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_C_FLAGS=-Werror
+          -DI8087_SANITIZE=${{ matrix.sanitize }}
+      - name: Configure Windows
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -DCMAKE_C_FLAGS=/WX
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel 2
+      - name: Require every existing test suite
+        shell: bash
+        run: |
+          ctest --test-dir build -C ${{ matrix.build_type }} --show-only=json-v1 > build/test-inventory.json
+          python -c "import json; names={t['name'] for t in json.load(open('build/test-inventory.json'))['tests']}; required={'instructions','original_8087_regressions','raw_state_safety','rational_oracle','instruction_fraction_oracle','trace_tool_contracts'}; assert required <= names, required - names"
+      - name: Test
+        run: >-
+          ctest --test-dir build -C ${{ matrix.build_type }}
+          --output-on-failure --output-log ctest.log --output-junit test-results.xml
+      - name: Preserve test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tests-${{ matrix.name }}
+          path: |
+            build/ctest.log
+            build/test-results.xml
+            build/test-inventory.json
+            build/Testing/Temporary/LastTest.log
+
+  tools:
+    name: standalone build and DOS probe
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build without test dependencies
+        run: |
+          cmake -S . -B build -DI8087_BUILD_TESTS=OFF -DCMAKE_C_FLAGS=-Werror
+          cmake --build build --parallel 2
+          ./build/i8087_demo
+      - name: Reproduce collector binary (assembly only)
+        run: |
+          cp tools/hardware/CAPTURE.COM build/CAPTURE-original.COM
+          sh tools/hardware/build.sh
+          cmp build/CAPTURE-original.COM tools/hardware/CAPTURE.COM
+      - name: Preserve collector and source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dos-collector-unverified-on-hardware
+          path: |
+            tools/hardware/CAPTURE.COM
+            tools/hardware/capture.S
+            tools/hardware/build.sh
+            docs/HARDWARE_VALIDATION.md
