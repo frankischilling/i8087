@@ -123,3 +123,17 @@ replay and numerical test tools use a target-local Microsoft CRT setting to
 retain ISO C stdio. No original-hardware execution or non-x86 portability was
 established by these runs. The preceding 0.2.0 results remain historical records
 of the imported package.
+
+## Replay input integrity
+
+The trace suite now has 20 scenarios. Its additional checks use disposable files
+to verify that path aliases, hard links and existing outputs are rejected
+without overwriting data. Truncated and trailing reference payloads must fail
+before output creation; a complete synthetic framing fixture still supplies
+its instruction address to a successful replay. These fixtures test file
+handling and contain no captured hardware results.
+
+The input-alias regression was run against the imported tool and failed with
+`replay overwrote its input through a path alias`. The corrected tool passes
+that test. This is evidence of the file-handling correction, not processor
+accuracy.
