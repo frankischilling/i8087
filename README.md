@@ -43,8 +43,8 @@ cc -std=c11 -O2 -Iinclude -Isrc src/i8087.c src/soft80.c src/transcend.c \
 ```
 
 On multi-configuration CMake generators, add `--config Release` to the build,
-`-C Release` to CTest, and use `build/Release/`. GCC and Clang on Linux were
-tested. Windows/MSVC and other architectures were not.
+`-C Release` to CTest, and use `build/Release/`. CI tests GCC and Clang on Linux
+and MSVC on Windows. MinGW GCC also passes the suites locally.
 
 ## Project layout
 
@@ -68,5 +68,8 @@ The core does not model an entire computer.
 Read [the API contract](docs/API.md), [test results](docs/TESTING.md), and
 [hardware-validation workflow](docs/HARDWARE_VALIDATION.md) before integration.
 See [development](docs/DEVELOPMENT.md) for CI and pull request requirements.
+The [roadmap](docs/ROADMAP.md) links the open accuracy issues and
+[hardware evidence](docs/research/HARDWARE_EVIDENCE.md) records the initial
+8088/8087 target and the search for original captures.
 Original documentation and die-analysis references are in
 [SOURCES.md](docs/SOURCES.md). Source code in this package is MIT-licensed.
