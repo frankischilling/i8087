@@ -63,6 +63,12 @@ significand footnote is retained in the research record.
 
 ## Original instruction and exception details
 
+Table A-2, printed S-112 through S-114, explicitly assigns operations to nine
+register encoding groups that Intel's translators do not emit. The decoder
+accepts these 72 forms. [The encoding investigation](research/ALTERNATE_ENCODINGS.md)
+records the exact bytes, original footnotes and recovered FFREE-plus-pop tag
+sequence. Reserved encodings outside that list remain unresolved.
+
 The 1981 manual's FXTRACT description explicitly discusses signed-zero results
 and field extraction. The FPREM condition-code shift rule is also visible in
 Table 4b of the datasheet, printed 3-99 (PDF index 9). Exception discussions

@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from trace_format import INPUT_MAGIC, MODEL_MAGIC, HARDWARE_MAGIC, HEADER, read_trace, write_trace
+from trace_format import INPUT_MAGIC, MODEL_MAGIC, HARDWARE_MAGIC, HEADER, Trace, read_trace, write_trace
 from make_vectors import make_cases
 from compare_traces import compare
 
@@ -131,6 +131,31 @@ def main():
         assert sum(int.from_bytes(row[:2], "little") == 2 for row in rows) == 24
         assert sum(int.from_bytes(row[:2], "little") == 0 for row in rows) == 72
         tests += 1
+        alternate, labels = make_cases("encodings")
+        assert len(alternate) == len(labels) == 72
+        alternate_src, alternate_dst = directory / "alternate-input.bin", directory / "alternate-model.bin"
+        write_trace(alternate_src, INPUT_MAGIC, alternate)
+        subprocess.run([replay, str(alternate_src), str(alternate_dst)], check=True, capture_output=True)
+        queries, results = read_trace(alternate_src), read_trace(alternate_dst)
+        assert all(row[:6] == bytes(6) for row in results.records)
+        assert compare(queries, results, results)["matched"] == 72
+        # A synthetic comparison-flag error must not disappear behind a mask.
+        changed = []
+        for query, row in zip(alternate, results.records):
+            corrupt = bytearray(row)
+            if query[0] == 0xDC or (query[0] == 0xDE and 0xD0 <= query[1] <= 0xD7):
+                corrupt[9] ^= 1  # status C0 in the saved image
+            changed.append(bytes(corrupt))
+        reference = Trace(MODEL_MAGIC, results.instruction_address, tuple(changed))
+        assert compare(queries, reference, results)["mismatched"] == 24
+        tests += 1
+        for esc, modrm in ((0xD9, 0xD1), (0xD9, 0xD7), (0xDD, 0xE0),
+                           (0xDE, 0xD8), (0xDE, 0xDA), (0xDF, 0xE0)):
+            bad = bytearray(alternate[0]);bad[:2] = bytes((esc, modrm))
+            write_trace(src, INPUT_MAGIC, [bytes(bad)])
+            assert subprocess.run([replay, str(src), str(directory / f"reserved-{esc}-{modrm}.bin")],
+                                  capture_output=True).returncode != 0
+            tests += 1
     print(f"PASS: {tests} trace-tool scenarios; {len(records)} smoke and {len(rounding)} FRNDINT model-only round trips; no hardware evidence")
 
 if __name__ == "__main__":

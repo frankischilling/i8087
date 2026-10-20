@@ -42,7 +42,9 @@ The smoke suite has 388 input cases; the research suite has 48. `--suite researc
 selects deliberately unverified areas. `--suite frndint` supplies 384 masked
 FRNDINT inputs covering raw unnormals, denormals, pseudozeros, signed zeros and
 integral/fractional boundaries across control modes. `--suite all` combines the
-four suites. `--suite overflow` adds 96 masked arithmetic overflow inputs across
+five suites. `--suite encodings` adds 72 inputs for the nine alternate register
+encoding groups explicitly documented in Intel Table A-2. `--suite overflow`
+adds 96 masked arithmetic overflow inputs across
 signs, PC and RC. Its 24 CHOP cases remain guarded in the model; a blocked row
 is not a passing comparison. Input generation alone establishes nothing about
 the chip or the emulator's accuracy.
@@ -166,7 +168,9 @@ reuse it as evidence.
 
 The collector accepts only documented register-form ESC instructions, with all
 six individual exceptions masked and initial IR/BUSY clear. It deliberately
-rejects memory instructions, undocumented/later aliases and unmasked tests.
+includes the [72 alternate encodings](research/ALTERNATE_ENCODINGS.md) listed
+by Intel, while rejecting memory instructions, reserved/later encodings and
+unmasked tests.
 The test slot is rewritten and followed by a taken jump to flush the 8086/8088
 prefetch queue before execution.
 

@@ -92,12 +92,21 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
                                              ("FDIV", 0xF1, (0x3FFE, J))):
                         add(f"{name} masked overflow sign={sign} pc={pc} rc={rc}",
                             0xD8, opcode, a, b, cw=0x10BF | pc << 8 | rc << 10)
+    if suite in ("encodings", "all"):
+        forms = ((0xD9, 0xD8, "FSTP"), (0xDC, 0xD0, "FCOM"),
+                 (0xDC, 0xD8, "FCOMP"), (0xDD, 0xC8, "FXCH"),
+                 (0xDE, 0xD0, "FCOMP"), (0xDF, 0xC0, "FFREE+pop"),
+                 (0xDF, 0xC8, "FXCH"), (0xDF, 0xD0, "FSTP"), (0xDF, 0xD8, "FSTP"))
+        for esc, base, name in forms:
+            for i in range(8):
+                add(f"Intel Table A-2 {esc:02x} {base+i:02x} {name} ST({i})", esc, base+i,
+                    integer(1), integer(2), other=tuple(integer(k) for k in range(3, 9)))
     return records, names
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "all"), default="smoke")
+    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "encodings", "all"), default="smoke")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     records, names = make_cases(args.suite)

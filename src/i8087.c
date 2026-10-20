@@ -543,19 +543,33 @@ static bool valid_register(uint8_t esc,uint8_t m) {
     switch(esc) {
     case 0xd8:return true;
     case 0xd9:
-        return m<=0xcf||m==0xd0||m==0xe0||m==0xe1||m==0xe4||m==0xe5||
+        return m<=0xcf||m==0xd0||(m>=0xd8&&m<=0xdf)||m==0xe0||m==0xe1||m==0xe4||m==0xe5||
                (m>=0xe8&&m<=0xee)||(m>=0xf0&&m<=0xf4)||
                (m>=0xf6&&m<=0xfa)||m==0xfc||m==0xfd;
     case 0xdb:return m>=0xe0&&m<=0xe3;
-    case 0xdc:return group!=2&&group!=3;
-    case 0xdd:return group==0||group==2||group==3;
-    case 0xde:return group==0||group==1||group>=4||m==0xd9;
+    case 0xdc:return true;
+    case 0xdd:case 0xdf:return group<=3;
+    case 0xde:return group!=3||m==0xd9;
     default:return false;
     }
 }
 static i8087_result register_instruction(transaction *t,uint8_t esc,uint8_t m) {
     unsigned group=(m>>3)&7,i=m&7,op=group;
     i8087_f80 a,b;
+    /* Table A-2, S-112..S-114 lists these translator-unused encodings.
+       Dispatch through their named operation; the saved opcode stays original. */
+    if(esc==0xdf&&group==0) {
+        set_tag(&t->f,physical(&t->f,i),I8087_TAG_EMPTY);pop(t);return I8087_OK;
+    }
+    if((esc==0xd9&&group==3)||(esc==0xdf&&(group==2||group==3))) {
+        esc=0xdd;m=(uint8_t)(0xd8|i);group=3;
+    } else if((esc==0xdd||esc==0xdf)&&group==1) {
+        esc=0xd9;
+    } else if(esc==0xdc&&(group==2||group==3)) {
+        esc=0xd8;
+    } else if(esc==0xde&&group==2) {
+        esc=0xd8;m=(uint8_t)(0xd8|i);group=3;
+    }
     if(esc==0xdb) {
         switch(m) {
         case 0xe0:t->f.control&=(uint16_t)~I8087_INTERRUPT_MASK;break;

@@ -29,7 +29,7 @@ exception or electrical behavior. Passing counts must not be presented as an
 | Exceptions | Separate sticky flags and event latch; before/after distinction; unmasked PE commits result/store/pop | Unmasked invalid comparison continuation and some special-result paths remain guarded; no asynchronous microinstruction model |
 | Range | Canonical unmasked register exponent wrapping; original exact-tiny UE; suppressed unmasked real stores | Reduced-PC masked underflow, CHOP-overflow disagreement, and malformed/unnormal range paths still need investigation |
 | Environment | Fourteen-byte environment and 94-byte save/restore; original 20-bit pointer layout | Reserved-bit readback and malformed restore images not hardware-certified |
-| Instruction decoding | Documented ESC forms; rejection of later extensions | Undocumented aliases not implemented; full decoder smoke test is not an ISA oracle |
+| Instruction decoding | Documented ESC forms, including the nine alternate groups in Intel Table A-2; rejection of later extensions | Reserved decoder behavior remains unresolved; full decoder smoke test is not an ISA oracle |
 | Timing/electrical | No implementation | No cycle count, prefetch snooping, queue, dummy read, DMA/arbitration, pin transition or execution-overlap model |
 
 ## Known-gap policy
