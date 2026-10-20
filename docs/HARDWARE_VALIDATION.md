@@ -38,14 +38,26 @@ The generator writes three files:
 | `cases.json` | Case names, indices and SHA-256 of the input file |
 | `capture-metadata.template.json` | Unfilled provenance form, explicitly not a capture |
 
-The smoke suite has 412 input cases; the research suite has 48. `--suite research`
-selects deliberately unverified areas. `--suite frndint` supplies 384 masked
-FRNDINT inputs covering raw unnormals, denormals, pseudozeros, signed zeros and
-integral/fractional boundaries across control modes. `--suite all` combines the
-four suites. `--suite overflow` adds 96 masked arithmetic overflow inputs across
-signs, PC and RC. Its 24 CHOP cases remain guarded in the model; a blocked row
-is not a passing comparison. Input generation alone establishes nothing about
-the chip or the emulator's accuracy.
+Select a campaign with `--suite`:
+
+| Suite | Inputs | Purpose |
+| --- | --- | --- |
+| `smoke` | 412 | Supported arithmetic, remainder and selected raw-state paths |
+| `research` | 48 | Deliberately unverified areas |
+| `frndint` | 384 | Raw operand classes and rounding boundaries across PC/RC fields |
+| `overflow` | 96 | Masked arithmetic overflow across signs and control modes; 24 CHOP rows remain guarded |
+| `constants` | 2,688 | All seven loads, documented PC fields, RC, TOP, empty/full stacks and clear/set sticky PE |
+| `all` | 3,628 | Combined campaigns |
+
+The constant campaign preserves known raw bytes in every register and records
+which inputs have occupied stacks. Its model-only check has 384 supported
+FLD1/FLDZ pushes and 2,304 blocked cases. A blocked row is not a passing hardware
+comparison. The five other constant payloads still need original evidence;
+see [the source investigation](research/CONSTANT_LOADS.md).
+
+Input generation alone establishes nothing about the chip or the emulator's
+accuracy. The FRNDINT campaign includes every raw PC field value; reserved
+field probes do not establish documented behavior for that setting.
 
 `tools/hardware/CAPTURE.COM` is supplied together with its assembly source. The
 build script can reproduce it using GNU `as` and `ld` with 32-bit ELF support;

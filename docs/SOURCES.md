@@ -11,6 +11,8 @@ bounded path without using the general transcendental fallback.
 The current [hardware-evidence search](research/HARDWARE_EVIDENCE.md) records
 revision-identification limits, the initial IBM 5150-style target and capture
 leads. A source edition or speed grade does not identify a silicon stepping.
+The [constant-load investigation](research/CONSTANT_LOADS.md) separates the
+decoded fixed-transfer path from the still-unconfirmed payload bits.
 
 ## Intel 8087 datasheet, order 205835-007
 

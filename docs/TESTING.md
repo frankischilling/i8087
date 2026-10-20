@@ -174,6 +174,21 @@ They do not establish agreement with a physical 8087. See
 [the investigation](research/DIRECTED_OVERFLOW.md) for the source discrepancy
 and limits of the decoded-path inference.
 
+## Constant-load campaign
+
+The input builder supports arbitrary TOP while keeping saved values in logical
+ST order and tags in physical order. Three independently stated tag words
+check that rotation. A model-only campaign exercises 2,688 masked constant-load
+inputs: all seven opcodes, documented PC fields, all RC fields, every TOP,
+empty/full stacks, and initially clear/set PE.
+
+The 384 supported FLD1/FLDZ rows check values, stack position, tags, sticky flags
+and preserved raw register storage. The 2,304 remaining rows must retain the
+constant-ROM or stack-fault diagnostic and leave all architectural bytes
+unchanged. Those rejections are counted as blocked. The campaign supplies no
+expected hardware bytes for the five unresolved constant payloads. See
+[the source investigation](research/CONSTANT_LOADS.md).
+
 ## F2XM1 signed-zero return
 
 The encoded-instruction regressions add 2,048 canonical signed-zero cases across
