@@ -14,11 +14,13 @@
 typedef struct wide {
     uint64_t hi, lo;
 } wide;
+
 typedef struct unpacked {
     uint64_t sig;
     int32_t exp;
     bool sign;
 } unpacked;
+
 typedef struct rounded {
     uint64_t sig;
     int32_t exp;
@@ -31,16 +33,19 @@ static wide w64(uint64_t x)
     wide r = {0, x};
     return r;
 }
+
 static bool wnz(wide x)
 {
     return x.hi != 0 || x.lo != 0;
 }
+
 static int wcmp(wide a, wide b)
 {
     if (a.hi != b.hi)
         return a.hi > b.hi ? 1 : -1;
     return a.lo == b.lo ? 0 : (a.lo > b.lo ? 1 : -1);
 }
+
 static wide wadd(wide a, wide b)
 {
     wide r;
@@ -48,6 +53,7 @@ static wide wadd(wide a, wide b)
     r.hi = a.hi + b.hi + (r.lo < a.lo);
     return r;
 }
+
 static wide wsub(wide a, wide b)
 {
     wide r;
@@ -55,6 +61,7 @@ static wide wsub(wide a, wide b)
     r.hi = a.hi - b.hi - (a.lo < b.lo);
     return r;
 }
+
 static wide wleft(wide x, unsigned n)
 {
     wide r;
@@ -71,6 +78,7 @@ static wide wleft(wide x, unsigned n)
     r.lo = x.lo << n;
     return r;
 }
+
 static wide wright(wide x, unsigned n)
 {
     wide r;
@@ -87,6 +95,7 @@ static wide wright(wide x, unsigned n)
     r.hi = x.hi >> n;
     return r;
 }
+
 static wide wjam(wide x, unsigned n)
 {
     wide r = wright(x, n);
@@ -94,6 +103,7 @@ static wide wjam(wide x, unsigned n)
         r.lo |= 1;
     return r;
 }
+
 static unsigned wbits(wide x)
 {
     unsigned n = 0;
@@ -104,6 +114,7 @@ static unsigned wbits(wide x)
     }
     return n + (x.hi ? 64u : 0u);
 }
+
 static wide wmul(uint64_t a, uint64_t b)
 {
     const uint64_t mask = UINT64_C(0xffffffff);
@@ -113,6 +124,7 @@ static wide wmul(uint64_t a, uint64_t b)
     wide r = {p3 + (p1 >> 32) + (p2 >> 32) + (middle >> 32), (middle << 32) | (p0 & mask)};
     return r;
 }
+
 static unpacked unpack(i8087_f80 x)
 {
     unpacked r;
@@ -135,19 +147,23 @@ enum sf_kind sf_kind(i8087_f80 x)
         return x.significand == JBIT ? SF_INFINITY : SF_NAN;
     return x.significand ? SF_FINITE : SF_ZERO;
 }
+
 bool sf_sign(i8087_f80 x)
 {
     return (x.sign_exponent & 0x8000u) != 0;
 }
+
 bool sf_unnormal(i8087_f80 x)
 {
     unsigned e = x.sign_exponent & EXP_MASK;
     return e && e != EXP_MASK && !(x.significand & JBIT);
 }
+
 bool sf_denormal(i8087_f80 x)
 {
     return !(x.sign_exponent & EXP_MASK) && x.significand != 0;
 }
+
 unsigned sf_tag(i8087_f80 x)
 {
     /* A zero significand with a nonzero finite exponent is an original-8087
@@ -160,25 +176,30 @@ unsigned sf_tag(i8087_f80 x)
         return I8087_TAG_SPECIAL;
     return I8087_TAG_VALID; /* 8087 unnormals are VALID, not SPECIAL. */
 }
+
 i8087_f80 sf_zero(bool sign)
 {
     i8087_f80 r = {0, (uint16_t)(sign ? 0x8000 : 0)};
     return r;
 }
+
 i8087_f80 sf_infinity(bool sign)
 {
     i8087_f80 r = {JBIT, (uint16_t)(0x7fff | (sign ? 0x8000 : 0))};
     return r;
 }
+
 i8087_f80 sf_indefinite(void)
 {
     i8087_f80 r = {UINT64_C(0xc000000000000000), 0xffff};
     return r;
 }
+
 int32_t sf_exponent(i8087_f80 x)
 {
     return unpack(x).exp;
 }
+
 i8087_f80 sf_normalize(i8087_f80 x)
 {
     unpacked u = unpack(x);
@@ -255,6 +276,7 @@ static rounded quantize(bool sign, int32_t exp, wide x, unsigned precision, unsi
         r.flags |= I8087_UE;
     return r;
 }
+
 static sf_result finish(bool sign, int32_t e, wide sig, unsigned p, unsigned rc)
 {
     rounded q = quantize(sign, e, sig, p, rc, -16382, 16383);
@@ -281,11 +303,13 @@ static sf_result finish(bool sign, int32_t e, wide sig, unsigned p, unsigned rc)
     }
     return r;
 }
+
 static sf_result result(i8087_f80 x, uint16_t flags)
 {
     sf_result r = {x, flags, false, {0}};
     return r;
 }
+
 static sf_result nan_result(i8087_f80 a, i8087_f80 b)
 {
     i8087_f80 x = sf_kind(a) == SF_NAN ? a : b;
@@ -293,6 +317,7 @@ static sf_result nan_result(i8087_f80 a, i8087_f80 b)
         x = b;
     return result(x, I8087_IE); /* Original 8087: all NaN operands signal. */
 }
+
 i8087_f80 sf_from_u64(uint64_t x, bool sign)
 {
     i8087_f80 r;
@@ -307,6 +332,7 @@ i8087_f80 sf_from_u64(uint64_t x, bool sign)
     r.sign_exponent = (uint16_t)(e + BIAS + (sign ? 0x8000 : 0));
     return r;
 }
+
 i8087_f80 sf_from_signed_bits(uint64_t bits, unsigned width)
 {
     uint64_t mask = width == 64 ? UINT64_MAX : (UINT64_C(1) << width) - 1;
@@ -314,6 +340,7 @@ i8087_f80 sf_from_signed_bits(uint64_t bits, unsigned width)
     bits &= mask;
     return sf_from_u64(sign ? ((~bits + 1) & mask) : bits, sign);
 }
+
 i8087_f80 sf_load_ieee(uint64_t bits, unsigned width, uint16_t *flags)
 {
     unsigned frac = width == 32 ? 23u : 52u;
@@ -340,6 +367,7 @@ i8087_f80 sf_load_ieee(uint64_t bits, unsigned width, uint16_t *flags)
     r.sign_exponent = (uint16_t)((int)(e ? e : 1) - (int)bias + BIAS + (sign ? 0x8000 : 0));
     return r;
 }
+
 uint64_t sf_store_ieee(i8087_f80 x, unsigned width, unsigned rc, uint16_t *flags, bool *up)
 {
     unsigned frac = width == 32 ? 23u : 52u, bias = width == 32 ? 127u : 1023u;
@@ -372,6 +400,7 @@ uint64_t sf_store_ieee(i8087_f80 x, unsigned width, unsigned rc, uint16_t *flags
     return sign | ((q.sig & JBIT ? (uint64_t)(q.exp + (int32_t)bias) : 0) << frac) |
            ((q.sig >> (63 - frac)) & ((UINT64_C(1) << frac) - 1));
 }
+
 sf_result sf_add(i8087_f80 a, i8087_f80 b, unsigned p, unsigned rc)
 {
     enum sf_kind ka = sf_kind(a), kb = sf_kind(b);
@@ -410,6 +439,7 @@ sf_result sf_add(i8087_f80 a, i8087_f80 b, unsigned p, unsigned rc)
     }
     return finish(sign, ua.exp, s, p, rc);
 }
+
 sf_result sf_multiply(i8087_f80 a, i8087_f80 b, unsigned p, unsigned rc)
 {
     enum sf_kind ka = sf_kind(a), kb = sf_kind(b);
@@ -429,6 +459,7 @@ sf_result sf_multiply(i8087_f80 a, i8087_f80 b, unsigned p, unsigned rc)
     prod = wmul(ua.sig, ub.sig);
     return finish(sign, ua.exp + ub.exp, wjam(prod, 60), p, rc);
 }
+
 sf_result sf_divide(i8087_f80 a, i8087_f80 b, unsigned p, unsigned rc)
 {
     enum sf_kind ka = sf_kind(a), kb = sf_kind(b);
@@ -471,6 +502,7 @@ sf_result sf_divide(i8087_f80 a, i8087_f80 b, unsigned p, unsigned rc)
         q.lo |= 1;
     return finish(sign, e, q, p, rc);
 }
+
 sf_result sf_sqrt(i8087_f80 x, unsigned p, unsigned rc)
 {
     enum sf_kind k = sf_kind(x);
@@ -511,6 +543,7 @@ sf_result sf_sqrt(i8087_f80 x, unsigned p, unsigned rc)
         root.lo |= 1;
     return finish(false, u.exp / 2, root, p, rc);
 }
+
 sf_result sf_scale(i8087_f80 x, int32_t delta, unsigned rc)
 {
     unpacked u;
@@ -523,6 +556,7 @@ sf_result sf_scale(i8087_f80 x, int32_t delta, unsigned rc)
         delta = -65536;
     return finish(u.sign, u.exp + delta, wleft(w64(u.sig), 3), 64, rc);
 }
+
 int sf_compare(i8087_f80 a, i8087_f80 b)
 {
     enum sf_kind ka = sf_kind(a), kb = sf_kind(b);
@@ -546,6 +580,7 @@ int sf_compare(i8087_f80 a, i8087_f80 b)
     }
     return sf_sign(a) ? -m : m;
 }
+
 static uint64_t integer_magnitude(unpacked u, unsigned rc, bool *lost, bool *up, bool *overflow)
 {
     uint64_t v, rem = 0, half = 0;
@@ -588,6 +623,7 @@ static uint64_t integer_magnitude(unpacked u, unsigned rc, bool *lost, bool *up,
     }
     return v;
 }
+
 uint64_t sf_to_integer(i8087_f80 x, unsigned width, unsigned rc, uint16_t *flags, bool *up)
 {
     uint64_t limit = UINT64_C(1) << (width - 1), v;
@@ -610,6 +646,7 @@ uint64_t sf_to_integer(i8087_f80 x, unsigned width, unsigned rc, uint16_t *flags
         *flags |= I8087_PE;
     return u.sign ? (UINT64_C(0) - v) : v;
 }
+
 sf_result sf_round_integer(i8087_f80 x, unsigned rc)
 {
     unpacked u = unpack(x);
@@ -630,6 +667,7 @@ sf_result sf_round_integer(i8087_f80 x, unsigned rc)
     r.rounded_up = up;
     return r;
 }
+
 i8087_f80 sf_remainder(i8087_f80 a, i8087_f80 b, uint8_t *quotient, bool *partial, unsigned *qwidth)
 {
     unpacked ua = unpack(a), ub = unpack(b);

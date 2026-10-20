@@ -24,6 +24,7 @@ static uint16_t get16(const uint8_t *p)
 {
     return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
 }
+
 static uint64_t get_le(const uint8_t *p, size_t n)
 {
     uint64_t r = 0;
@@ -32,6 +33,7 @@ static uint64_t get_le(const uint8_t *p, size_t n)
         r |= (uint64_t)p[i] << (8 * i);
     return r;
 }
+
 static void put_le(uint8_t *p, uint64_t x, size_t n)
 {
     size_t i;
@@ -40,6 +42,7 @@ static void put_le(uint8_t *p, uint64_t x, size_t n)
         x >>= 8;
     }
 }
+
 void i8087_encode_f80(uint8_t p[10], i8087_f80 x)
 {
     if (!p)
@@ -47,6 +50,7 @@ void i8087_encode_f80(uint8_t p[10], i8087_f80 x)
     put_le(p, x.significand, 8);
     put_le(p + 8, x.sign_exponent, 2);
 }
+
 i8087_f80 i8087_decode_f80(const uint8_t p[10])
 {
     i8087_f80 x = {0, 0};
@@ -56,18 +60,22 @@ i8087_f80 i8087_decode_f80(const uint8_t p[10])
     }
     return x;
 }
+
 unsigned i8087_top(const i8087 *f)
 {
     return f ? (unsigned)((f->status >> 11) & 7) : 0;
 }
+
 static unsigned physical(const i8087 *f, unsigned i)
 {
     return (i8087_top(f) + i) & 7;
 }
+
 unsigned i8087_tag(const i8087 *f, unsigned i)
 {
     return f && i < 8 ? (unsigned)((f->tags >> (physical(f, i) * 2)) & 3) : I8087_TAG_EMPTY;
 }
+
 bool i8087_get_st(const i8087 *f, unsigned i, i8087_f80 *x)
 {
     if (!f || !x || i >= 8 || i8087_tag(f, i) == I8087_TAG_EMPTY)
@@ -75,20 +83,24 @@ bool i8087_get_st(const i8087 *f, unsigned i, i8087_f80 *x)
     *x = f->registers[physical(f, i)];
     return true;
 }
+
 static void set_top(i8087 *f, unsigned top)
 {
     f->status = (uint16_t)((f->status & (uint16_t)~I8087_TOP) | ((top & 7u) << 11));
 }
+
 static void set_tag(i8087 *f, unsigned p, unsigned tag)
 {
     f->tags = (uint16_t)((f->tags & ~(3u << (2 * p))) | ((tag & 3) << (2 * p)));
 }
+
 static void set_st(i8087 *f, unsigned i, i8087_f80 x)
 {
     unsigned p = physical(f, i);
     f->registers[p] = x;
     set_tag(f, p, sf_tag(x));
 }
+
 /* IR is an exception-event latch, not a combinational function of the six
    sticky status flags and the CURRENT masks. FLDCW must not retroactively
    turn an old masked exception into a new interrupt. */
@@ -99,10 +111,12 @@ static void synchronize_busy(i8087 *f)
     else
         f->status &= (uint16_t)~I8087_BUSY;
 }
+
 bool i8087_interrupt_asserted(const i8087 *f)
 {
     return f && (f->status & I8087_IR) && (!(f->control & I8087_INTERRUPT_MASK) || f->cpu_waiting);
 }
+
 i8087_result i8087_wait(i8087 *f)
 {
     if (!f)
@@ -113,6 +127,7 @@ i8087_result i8087_wait(i8087 *f)
     f->cpu_waiting = false;
     return I8087_OK;
 }
+
 static void software_init(i8087 *f)
 {
     /* Reserved bit 6 is deterministically zero. CC bits are unspecified by
@@ -122,6 +137,7 @@ static void software_init(i8087 *f)
     f->tags = 0xffff;
     f->cpu_waiting = false;
 }
+
 void i8087_init(i8087 *f)
 {
     if (!f)
@@ -130,15 +146,18 @@ void i8087_init(i8087 *f)
     f->policy = I8087_STOP_ON_UNVERIFIED;
     software_init(f);
 }
+
 void i8087_set_policy(i8087 *f, i8087_policy p)
 {
     if (f && (p == I8087_STOP_ON_UNVERIFIED || p == I8087_ALLOW_APPROXIMATION))
         f->policy = p;
 }
+
 static void gap(transaction *t, uint32_t why)
 {
     t->f.last_gap |= why;
 }
+
 static i8087_f80 read_st(transaction *t, unsigned i)
 {
     i8087_f80 x;
@@ -149,6 +168,7 @@ static i8087_f80 read_st(transaction *t, unsigned i)
     gap(t, I8087_GAP_STACK_FAULT);
     return sf_indefinite();
 }
+
 static void push_tagged(transaction *t, i8087_f80 x, unsigned tag)
 {
     unsigned p = (i8087_top(&t->f) + 7) & 7;
@@ -163,26 +183,31 @@ static void push_tagged(transaction *t, i8087_f80 x, unsigned tag)
     t->f.registers[p] = x;
     set_tag(&t->f, p, tag);
 }
+
 static void push(transaction *t, i8087_f80 x)
 {
     push_tagged(t, x, sf_tag(x));
 }
+
 static unsigned read_tag(const transaction *t, unsigned i)
 {
     unsigned tag = i8087_tag(&t->f, i);
     return tag == I8087_TAG_EMPTY ? I8087_TAG_SPECIAL : tag;
 }
+
 static void write_tagged(i8087 *f, unsigned i, i8087_f80 x, unsigned tag)
 {
     unsigned p = physical(f, i);
     f->registers[p] = x;
     set_tag(f, p, tag);
 }
+
 static void pop(transaction *t)
 {
     set_tag(&t->f, i8087_top(&t->f), I8087_TAG_EMPTY);
     set_top(&t->f, (i8087_top(&t->f) + 1) & 7);
 }
+
 static unsigned precision(transaction *t)
 {
     unsigned pc = (t->f.control >> 8) & 3;
@@ -190,10 +215,12 @@ static unsigned precision(transaction *t)
         gap(t, I8087_GAP_RESERVED_PRECISION);
     return pc == 0 ? 24 : (pc == 2 ? 53 : 64);
 }
+
 static unsigned rounding(const transaction *t)
 {
     return (t->f.control >> 10) & 3;
 }
+
 static void accept_numeric(transaction *t, sf_result *r)
 {
     sf_unbounded *u = &r->unbounded;
@@ -250,11 +277,13 @@ static void accept_numeric(transaction *t, sf_result *r)
     /* Arithmetic C1 remains an implementation choice where Intel says undefined. */
     t->f.status = (uint16_t)((t->f.status & ~I8087_C1) | (r->rounded_up ? I8087_C1 : 0));
 }
+
 static void check_denormal(transaction *t, i8087_f80 x)
 {
     if (sf_denormal(x))
         t->raised |= I8087_DE;
 }
+
 static void compare(transaction *t, i8087_f80 a, i8087_f80 b, unsigned pops)
 {
     int relation;
@@ -280,6 +309,7 @@ static void compare(transaction *t, i8087_f80 a, i8087_f80 b, unsigned pops)
     while (pops--)
         pop(t);
 }
+
 static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_f80 a, i8087_f80 b,
                        bool do_pop)
 {
@@ -325,6 +355,7 @@ static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_
     if (do_pop)
         pop(t);
 }
+
 static void examine(transaction *t)
 {
     i8087_f80 x = t->f.registers[i8087_top(&t->f)];
@@ -344,6 +375,7 @@ static void examine(transaction *t)
         cc |= I8087_C2;
     t->f.status = (uint16_t)((t->f.status & ~CC) | cc);
 }
+
 static void encode_env(const i8087 *f, uint8_t *p)
 {
     put_le(p, f->control, 2);
@@ -354,6 +386,7 @@ static void encode_env(const i8087 *f, uint8_t *p)
     put_le(p + 10, f->data_address & 0xffff, 2);
     put_le(p + 12, (f->data_address >> 4) & 0xf000, 2);
 }
+
 static void decode_env(i8087 *f, const uint8_t *p)
 {
     f->control = (uint16_t)(get16(p) & 0x1fbf);
@@ -364,6 +397,7 @@ static void decode_env(i8087 *f, const uint8_t *p)
     f->data_address = (uint32_t)get16(p + 10) | ((uint32_t)(get16(p + 12) & 0xf000) << 4);
     synchronize_busy(f);
 }
+
 static void load_bcd(transaction *t, const uint8_t *p)
 {
     uint64_t v = 0;
@@ -382,6 +416,7 @@ static void load_bcd(transaction *t, const uint8_t *p)
     }
     push(t, sf_from_u64(v, (p[9] & 0x80) != 0));
 }
+
 static void store_bcd(transaction *t, i8087_f80 x)
 {
     uint16_t flags = 0;
@@ -414,6 +449,7 @@ static void store_bcd(transaction *t, i8087_f80 x)
     t->write_size = 10;
     pop(t);
 }
+
 static void store_ieee(transaction *t, i8087_f80 x, unsigned width, bool do_pop)
 {
     uint16_t flags = 0;
@@ -454,6 +490,7 @@ static void store_ieee(transaction *t, i8087_f80 x, unsigned width, bool do_pop)
     if (do_pop)
         pop(t);
 }
+
 static void store_integer(transaction *t, i8087_f80 x, unsigned width, bool do_pop)
 {
     uint16_t flags = 0;
@@ -556,6 +593,7 @@ static size_t memory_read_size(uint8_t esc, unsigned reg, bool *valid, bool *con
     *valid = false;
     return 0;
 }
+
 static i8087_result memory_instruction(transaction *t, uint8_t esc, unsigned reg)
 {
     i8087_f80 x;
@@ -675,6 +713,7 @@ static i8087_result memory_instruction(transaction *t, uint8_t esc, unsigned reg
     }
     return I8087_OK;
 }
+
 static void extract(transaction *t)
 {
     i8087_f80 x = read_st(t, 0), exponent, significand = x;
@@ -698,6 +737,7 @@ static void extract(transaction *t)
     set_st(&t->f, 0, exponent);
     push(t, significand);
 }
+
 static void remainder_instruction(transaction *t)
 {
     i8087_f80 a = read_st(t, 0), b = read_st(t, 1), r;
@@ -745,6 +785,7 @@ static void remainder_instruction(transaction *t)
     }
     set_st(&t->f, 0, r);
 }
+
 static void scale_instruction(transaction *t)
 {
     i8087_f80 x, y;
@@ -805,6 +846,7 @@ static void scale_instruction(transaction *t)
     accept_numeric(t, &r);
     set_st(&t->f, 0, r.value);
 }
+
 static i8087_result special_instruction(transaction *t, uint8_t m)
 {
     static const i8087_f80 constants[7] = {{UINT64_C(0x8000000000000000), 0x3fff},
@@ -920,6 +962,7 @@ static i8087_result special_instruction(transaction *t, uint8_t m)
     }
     return I8087_OK;
 }
+
 static bool valid_register(uint8_t esc, uint8_t m)
 {
     unsigned group = (m >> 3) & 7;
@@ -943,6 +986,7 @@ static bool valid_register(uint8_t esc, uint8_t m)
             return false;
     }
 }
+
 static i8087_result register_instruction(transaction *t, uint8_t esc, uint8_t m)
 {
     unsigned group = (m >> 3) & 7, i = m & 7, op = group;
@@ -1036,6 +1080,7 @@ static i8087_result register_instruction(transaction *t, uint8_t esc, uint8_t m)
     }
     return I8087_OK;
 }
+
 i8087_result i8087_execute(i8087 *f, const i8087_bus *bus, uint8_t esc, uint8_t m, uint32_t ip,
                            uint32_t ea)
 {
@@ -1129,6 +1174,7 @@ i8087_result i8087_execute(i8087 *f, const i8087_bus *bus, uint8_t esc, uint8_t 
     *f = t.f;
     return unmasked ? I8087_PENDING_INTERRUPT : I8087_OK;
 }
+
 const char *i8087_result_string(i8087_result r)
 {
     switch (r) {

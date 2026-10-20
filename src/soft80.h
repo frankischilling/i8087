@@ -4,6 +4,7 @@
 #include "i8087.h"
 
 enum sf_kind { SF_ZERO, SF_FINITE, SF_INFINITY, SF_NAN };
+
 /* The unbounded rounded value is retained separately from the canonical
    IEEE result. Original-8087 unmasked range exceptions need this value with
    exponent +/- 24576, NOT a rounded subnormal/infinity reconstructed later. */
@@ -13,6 +14,7 @@ typedef struct sf_unbounded {
     uint16_t flags;
     bool rounded_up, sign, valid;
 } sf_unbounded;
+
 typedef struct sf_result {
     i8087_f80 value;
     uint16_t flags;

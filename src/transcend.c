@@ -11,39 +11,48 @@ static const i8087_f80 ln2 = {UINT64_C(0xb17217f7d1cf79ac), 0x3ffe};
 static const i8087_f80 invln2 = {UINT64_C(0xb8aa3b295c17f0bc), 0x3fff};
 static const i8087_f80 pi4 = {UINT64_C(0xc90fdaa22168c235), 0x3ffe};
 static const i8087_f80 log1p_bound = {UINT64_C(0x95f619980c4336f7), 0x3ffd};
+
 static i8087_f80 add(i8087_f80 a, i8087_f80 b)
 {
     return sf_add(a, b, 64, 0).value;
 }
+
 static i8087_f80 neg(i8087_f80 a)
 {
     a.sign_exponent ^= 0x8000;
     return a;
 }
+
 static i8087_f80 sub(i8087_f80 a, i8087_f80 b)
 {
     return add(a, neg(b));
 }
+
 static i8087_f80 mul(i8087_f80 a, i8087_f80 b)
 {
     return sf_multiply(a, b, 64, 0).value;
 }
+
 static i8087_f80 divv(i8087_f80 a, i8087_f80 b)
 {
     return sf_divide(a, b, 64, 0).value;
 }
+
 static i8087_f80 integer(unsigned n)
 {
     return sf_from_u64(n, false);
 }
+
 static bool same(i8087_f80 a, i8087_f80 b)
 {
     return a.sign_exponent == b.sign_exponent && a.significand == b.significand;
 }
+
 static bool finite_normal(i8087_f80 a)
 {
     return sf_kind(a) == SF_FINITE && !sf_unnormal(a) && !sf_denormal(a);
 }
+
 static bool normal_or_zero(i8087_f80 a)
 {
     return sf_kind(a) == SF_ZERO || finite_normal(a);
@@ -63,6 +72,7 @@ static i8087_f80 atanh_series(i8087_f80 z)
     }
     return mul(sum, integer(2));
 }
+
 static i8087_f80 log2_value(i8087_f80 x)
 {
     int32_t e = sf_exponent(x);
@@ -72,6 +82,7 @@ static i8087_f80 log2_value(i8087_f80 x)
     whole = sf_from_u64((uint64_t)(e < 0 ? -e : e), e < 0);
     return add(whole, frac);
 }
+
 static i8087_f80 atan_value(i8087_f80 z)
 {
     i8087_f80 zz, term, sum, base = sf_zero(false);
@@ -93,6 +104,7 @@ static i8087_f80 atan_value(i8087_f80 z)
     }
     return add(base, sum);
 }
+
 bool sf_transcend(uint8_t op, i8087_f80 x, i8087_f80 y, sf_result *out, i8087_f80 *pushed)
 {
     i8087_f80 z, term, sum, xx;

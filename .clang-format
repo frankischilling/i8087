@@ -11,3 +11,4 @@ PointerAlignment: Right
 DerivePointerAlignment: false
 SortIncludes: CaseSensitive
 IndentCaseLabels: true
+SeparateDefinitionBlocks: Always

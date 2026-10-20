@@ -8,14 +8,17 @@
 #define TRACE_INPUT_SIZE 96u
 #define TRACE_OUTPUT_SIZE 100u
 #define TRACE_MAX_RECORDS 1000000u
+
 static uint16_t trace_u16(const uint8_t *p)
 {
     return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
 }
+
 static uint32_t trace_u32(const uint8_t *p)
 {
     return (uint32_t)trace_u16(p) | ((uint32_t)trace_u16(p + 2) << 16);
 }
+
 static void trace_put(uint8_t *p, uint32_t x, size_t n)
 {
     size_t i;
@@ -24,6 +27,7 @@ static void trace_put(uint8_t *p, uint32_t x, size_t n)
         x >>= 8;
     }
 }
+
 /* Only documented 8087 register encodings. No FNSTSW AX or later opcodes. */
 static bool trace_register_opcode(uint8_t esc, uint8_t m)
 {

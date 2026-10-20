@@ -18,6 +18,7 @@ static unsigned checks;
 static uint8_t memory[1u << 20];
 static bool fail_read, fail_write;
 static unsigned writes;
+
 static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n)
 {
     size_t i;
@@ -28,6 +29,7 @@ static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n)
         out[i] = memory[(address + (uint32_t)i) & 0xfffff];
     return true;
 }
+
 static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t n)
 {
     size_t i;
@@ -39,7 +41,9 @@ static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t 
         memory[(address + (uint32_t)i) & 0xfffff] = in[i];
     return true;
 }
+
 static const i8087_bus bus = {NULL, read_memory, write_memory};
+
 static void put(uint32_t address, uint64_t v, size_t n)
 {
     size_t i;
@@ -48,6 +52,7 @@ static void put(uint32_t address, uint64_t v, size_t n)
         v >>= 8;
     }
 }
+
 static uint64_t get(uint32_t address, size_t n)
 {
     uint64_t v = 0;
@@ -56,38 +61,46 @@ static uint64_t get(uint32_t address, size_t n)
         v |= (uint64_t)memory[(address + (uint32_t)i) & 0xfffff] << (8 * i);
     return v;
 }
+
 static i8087_result exec(i8087 *f, uint8_t esc, uint8_t m, uint32_t ea)
 {
     return i8087_execute(f, &bus, esc, m, 0xabcde, ea);
 }
+
 static void ok(i8087 *f, uint8_t esc, uint8_t m, uint32_t ea)
 {
     CHECK(exec(f, esc, m, ea) == I8087_OK);
 }
+
 static bool equal(i8087_f80 a, i8087_f80 b)
 {
     return a.significand == b.significand && a.sign_exponent == b.sign_exponent;
 }
+
 static i8087_f80 st(const i8087 *f, unsigned i)
 {
     i8087_f80 x;
     CHECK(i8087_get_st(f, i, &x));
     return x;
 }
+
 static void load80(i8087 *f, i8087_f80 x)
 {
     i8087_encode_f80(memory + 0x100, x);
     ok(f, 0xdb, 0x2e, 0x100);
 }
+
 static void loadint(i8087 *f, int64_t n)
 {
     put(0x100, (uint64_t)n, 8);
     ok(f, 0xdf, 0x2e, 0x100);
 }
+
 static void expectint(const i8087 *f, unsigned i, int64_t n)
 {
     CHECK(equal(st(f, i), sf_from_signed_bits((uint64_t)n, 64)));
 }
+
 static bool same_arch(const i8087 *a, const i8087 *b)
 {
     unsigned i;
@@ -100,6 +113,7 @@ static bool same_arch(const i8087 *a, const i8087 *b)
             return false;
     return true;
 }
+
 static void test_basics(void)
 {
     i8087 f, other;
@@ -157,6 +171,7 @@ static void test_basics(void)
     expectint(&f, 0, 7);
     expectint(&f, 1, 9);
 }
+
 static void test_arithmetic_order(void)
 {
     const struct {
@@ -166,6 +181,7 @@ static void test_arithmetic_order(void)
     } cases[] = {{0xd8, 0xe1, 6, 0}, {0xd8, 0xe9, -6, 0}, {0xd8, 0xf1, 4, 0},
                  {0xdc, 0xe1, 6, 1}, {0xdc, 0xe9, -6, 1}, {0xdc, 0xf1, 4, 1},
                  {0xde, 0xe1, 6, 0}, {0xde, 0xe9, -6, 0}, {0xde, 0xf1, 4, 0}};
+
     size_t i;
     i8087 f;
     for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -205,6 +221,7 @@ static void test_arithmetic_order(void)
     ok(&f, 0xda, 0x06, 0x80);
     expectint(&f, 0, 10);
 }
+
 static void test_numeric_ops(void)
 {
     i8087 f;
@@ -244,6 +261,7 @@ static void test_numeric_ops(void)
     CHECK(!f.last_gap);
     CHECK(!f.used_approximations);
 }
+
 static void test_transcendental_guards(void)
 {
     i8087 f, saved;
@@ -285,6 +303,7 @@ static void test_transcendental_guards(void)
     CHECK(exec(&f, 0xd9, 0xf0, 0) == I8087_UNVERIFIED);
     CHECK(f.last_gap & I8087_GAP_UNDEFINED_OPERAND);
 }
+
 static void test_specials(void)
 {
     i8087 f;
@@ -347,6 +366,7 @@ static void test_specials(void)
     ok(&f, 0xd9, 0xe5, 0);
     CHECK((f.status & 0x4700) == 0x4200);
 }
+
 static void test_memory_and_unnormals(void)
 {
     i8087 f;
@@ -388,6 +408,7 @@ static void test_memory_and_unnormals(void)
     ok(&f, 0xdb, 0x1e, 0xffff);
     CHECK(get(0xffff, 4) == 0x12345678); /* Does not wrap at 64 KiB. */
 }
+
 static void test_bcd(void)
 {
     i8087 f;
@@ -410,6 +431,7 @@ static void test_bcd(void)
     CHECK(exec(&f, 0xdf, 0x26, 0x200) == I8087_UNVERIFIED);
     CHECK(f.last_gap & I8087_GAP_UNDEFINED_OPERAND);
 }
+
 static void test_environments(void)
 {
     i8087 f, before;
@@ -451,6 +473,7 @@ static void test_environments(void)
     ok(&f, 0xd9, 0x2e, 0x420);
     CHECK(f.control == 0x1bbf);
 }
+
 static void test_interrupts(void)
 {
     i8087 f, before;
@@ -485,6 +508,7 @@ static void test_interrupts(void)
     CHECK(get(0x80, 2) == 12345);
     expectint(&f, 0, 40000);
 }
+
 static void test_failure_atomicity(void)
 {
     i8087 f, before;
@@ -513,6 +537,7 @@ static void test_failure_atomicity(void)
     CHECK(exec(&f, 0xdd, 0xe0, 0) == I8087_BAD_OPCODE); /* FUCOM */
     CHECK(same_arch(&f, &before));
 }
+
 static void test_decoder_smoke(void)
 {
     unsigned esc, m, i;
@@ -530,6 +555,7 @@ static void test_decoder_smoke(void)
             CHECK(!(f.status & 0x0040));
         }
 }
+
 int main(void)
 {
     test_basics();

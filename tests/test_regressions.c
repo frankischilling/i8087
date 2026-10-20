@@ -21,6 +21,7 @@ static unsigned long checks;
 static uint8_t memory[256];
 static bool fail_write;
 static unsigned writes;
+
 static bool rd(void *ctx, uint32_t a, uint8_t *p, size_t n)
 {
     (void)ctx;
@@ -29,6 +30,7 @@ static bool rd(void *ctx, uint32_t a, uint8_t *p, size_t n)
     memcpy(p, memory + a, n);
     return true;
 }
+
 static bool wr(void *ctx, uint32_t a, const uint8_t *p, size_t n)
 {
     (void)ctx;
@@ -38,45 +40,55 @@ static bool wr(void *ctx, uint32_t a, const uint8_t *p, size_t n)
     ++writes;
     return true;
 }
+
 static const i8087_bus bus = {NULL, rd, wr};
+
 static bool eq(i8087_f80 a, i8087_f80 b)
 {
     return a.significand == b.significand && a.sign_exponent == b.sign_exponent;
 }
+
 static void slot(i8087 *f, unsigned i, i8087_f80 x, unsigned tag)
 {
     unsigned p = (i8087_top(f) + i) & 7;
     f->registers[p] = x;
     f->tags = (uint16_t)((f->tags & ~(3u << (2 * p))) | (tag << (2 * p)));
 }
+
 static void number(i8087 *f, unsigned i, i8087_f80 x)
 {
     slot(f, i, x, sf_tag(x));
 }
+
 static i8087_f80 st(i8087 *f, unsigned i)
 {
     i8087_f80 x;
     CHECK(i8087_get_st(f, i, &x));
     return x;
 }
+
 static i8087_result op(i8087 *f, uint8_t esc, uint8_t m)
 {
     return i8087_execute(f, &bus, esc, m, 0x12345, 0);
 }
+
 static void ok(i8087 *f, uint8_t esc, uint8_t m)
 {
     CHECK(op(f, esc, m) == I8087_OK);
     CHECK(f->last_gap == 0);
 }
+
 static i8087_f80 integer(int n)
 {
     return sf_from_u64((uint64_t)(n < 0 ? -n : n), n < 0);
 }
+
 static uint16_t cc_from_q(unsigned q)
 {
     return (uint16_t)(((q & 4) ? I8087_C0 : 0) | ((q & 2) ? I8087_C3 : 0) |
                       ((q & 1) ? I8087_C1 : 0));
 }
+
 static bool same_registers(const i8087 *a, const i8087 *b)
 {
     unsigned i;
@@ -87,6 +99,7 @@ static bool same_registers(const i8087 *a, const i8087 *b)
             return false;
     return true;
 }
+
 static void extract_fields(void)
 {
     const uint16_t exponents[] = {0, 1, 17, 0x3ffe, 0x3fff, 0x4000, 0x7ffe};
@@ -115,6 +128,7 @@ static void extract_fields(void)
                         CHECK(i8087_top(&f) == 7);
                     }
 }
+
 static void remainder_flags(void)
 {
     unsigned a, b, sign, old, rc, pc;
@@ -173,6 +187,7 @@ static void remainder_flags(void)
         CHECK(eq(st(&f, 0), integer(1)));
     }
 }
+
 static void scale_early_exit_and_fields(void)
 {
     unsigned sign, which, tag;
@@ -225,6 +240,7 @@ static void scale_early_exit_and_fields(void)
         CHECK(f.status & I8087_DE);
     }
 }
+
 static void tangent_tiny(void)
 {
     const uint16_t exponents[] = {1, 17, 0x3f00, 0x3fbe, 0x3fbf};
@@ -271,6 +287,7 @@ static void tangent_tiny(void)
         CHECK((f.status & (I8087_PE | I8087_IR)) == (I8087_PE | I8087_IR));
     }
 }
+
 static void pseudozeros_and_tags(void)
 {
     i8087 f;
@@ -315,6 +332,7 @@ static void pseudozeros_and_tags(void)
         CHECK(i8087_tag(&f, 0) == tag);
     }
 }
+
 static void exceptions_and_interrupt_latch(void)
 {
     i8087 f, before;
@@ -414,6 +432,7 @@ static void exceptions_and_interrupt_latch(void)
     CHECK(same_registers(&f, &before));
     CHECK((f.status & 0x3f) == I8087_DE);
 }
+
 static void range_destinations_and_nan_signs(void)
 {
     i8087 f, before;
@@ -504,6 +523,7 @@ static void range_destinations_and_nan_signs(void)
     CHECK(same_registers(&f, &before));
     CHECK((f.status & CC) == (before.status & CC));
 }
+
 static void round_integer_raw_encodings(void)
 {
     /* Intel S-70 Table S-25 requires normalization before rounding an unnormal.
@@ -515,6 +535,7 @@ static void round_integer_raw_encodings(void)
                                         {UINT64_MAX, 0x403e},
                                         {JBIT, 0x403f},
                                         {JBIT + 2, 0x403f}};
+
     static const struct {
         i8087_f80 input;
         unsigned positive[4], negative[4];
@@ -532,6 +553,7 @@ static void round_integer_raw_encodings(void)
         {{0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, false, false},
         {{UINT64_MAX, 0x403e}, {4, 4, 4, 4}, {4, 4, 4, 4}, false, false},
         {{UINT64_C(0x4000000000000001), 0x4040}, {6, 6, 6, 6}, {6, 6, 6, 6}, false, false}};
+
     static const unsigned tops[] = {0, 3, 7};
     unsigned c, sign, pc, rc, masks, top_index, p;
     for (c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c)
@@ -590,6 +612,7 @@ static void round_integer_raw_encodings(void)
                                 }
                         }
 }
+
 static void masked_directed_overflow(void)
 {
     static const unsigned pcs[] = {0, 2, 3};
@@ -697,6 +720,7 @@ static void masked_directed_overflow(void)
                                     CHECK(memory[i] == 0x5a);
                             }
 }
+
 static void exponential_signed_zero(void)
 {
     unsigned sign, pc, rc, top, sticky, masks, full, p;
@@ -749,9 +773,11 @@ static void exponential_signed_zero(void)
         CHECK(same_registers(&f, &before));
     }
 }
+
 static void alternate_register_encodings(void)
 {
     enum { STORE_POP, EXCHANGE, COMPARE, COMPARE_POP, FREE_POP };
+
     /* Intel Table A-2, S-112..S-114: the nine starred encoding groups. */
     static const struct {
         uint8_t esc, base, canonical_esc, canonical_base;
@@ -761,6 +787,7 @@ static void alternate_register_encodings(void)
                  {0xde, 0xd0, 0xd8, 0xd8, COMPARE_POP}, {0xdf, 0xc0, 0, 0, FREE_POP},
                  {0xdf, 0xc8, 0xd9, 0xc8, EXCHANGE},    {0xdf, 0xd0, 0xdd, 0xd8, STORE_POP},
                  {0xdf, 0xd8, 0xdd, 0xd8, STORE_POP}};
+
     unsigned form, top, i, state, mode, trap, policy, k;
     for (form = 0; form < sizeof(forms) / sizeof(forms[0]); ++form)
         for (top = 0; top < 8; ++top)
@@ -890,6 +917,7 @@ static void alternate_register_encodings(void)
         }
     }
 }
+
 int main(void)
 {
     extract_fields();

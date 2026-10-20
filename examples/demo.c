@@ -4,6 +4,7 @@
 #include <string.h>
 
 static uint8_t memory[1024];
+
 static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n)
 {
     (void)ctx;
@@ -12,6 +13,7 @@ static bool read_memory(void *ctx, uint32_t address, uint8_t *out, size_t n)
     memcpy(out, memory + address, n);
     return true;
 }
+
 static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t n)
 {
     (void)ctx;
@@ -20,10 +22,12 @@ static bool write_memory(void *ctx, uint32_t address, const uint8_t *in, size_t 
     memcpy(memory + address, in, n);
     return true;
 }
+
 int main(void)
 {
     i8087 fpu;
     i8087_bus bus = {NULL, read_memory, write_memory};
+
     struct instruction {
         uint8_t opcode, modrm;
         uint32_t address;
@@ -35,6 +39,7 @@ int main(void)
         {0xde, 0xc9, 0}, /* FMULP ST(1),ST(0): 20 */
         {0xdb, 0x1e, 12} /* FISTP dword [12] */
     };
+
     size_t i;
     memory[0] = 2;
     memory[4] = 3;

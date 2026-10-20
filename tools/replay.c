@@ -10,6 +10,7 @@
 typedef struct image_bus {
     uint8_t bytes[94];
 } image_bus;
+
 static bool rd(void *ctx, uint32_t address, uint8_t *dst, size_t n)
 {
     image_bus *m = ctx;
@@ -18,6 +19,7 @@ static bool rd(void *ctx, uint32_t address, uint8_t *dst, size_t n)
     memcpy(dst, m->bytes, n);
     return true;
 }
+
 static bool wr(void *ctx, uint32_t address, const uint8_t *src, size_t n)
 {
     image_bus *m = ctx;
@@ -26,6 +28,7 @@ static bool wr(void *ctx, uint32_t address, const uint8_t *src, size_t n)
     memcpy(m->bytes, src, n);
     return true;
 }
+
 static bool complete_payload(FILE *f, uint32_t count, unsigned size)
 {
     long length;
@@ -36,6 +39,7 @@ static bool complete_payload(FILE *f, uint32_t count, unsigned size)
         return false;
     return fseek(f, (long)TRACE_HEADER_SIZE, SEEK_SET) == 0;
 }
+
 static bool header(FILE *f, uint8_t *h, const char *magic, unsigned size)
 {
     unsigned i;
@@ -48,6 +52,7 @@ static bool header(FILE *f, uint8_t *h, const char *magic, unsigned size)
             return false;
     return complete_payload(f, trace_u32(h + 8), size);
 }
+
 int main(int argc, char **argv)
 {
     FILE *in = NULL, *out = NULL, *ref = NULL;

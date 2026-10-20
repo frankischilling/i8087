@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+
 int main(void)
 {
     char line[256], op[16];

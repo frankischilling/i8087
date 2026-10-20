@@ -6,4 +6,5 @@
 *.S text eol=lf
 *.md text eol=lf
 *.yml text eol=lf
+/.clang-format text eol=lf
 *.COM binary

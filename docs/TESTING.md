@@ -101,8 +101,9 @@ sh tools/hardware/build.sh
 
 ## C formatting
 
-The repository's `.clang-format` defines the C style. Apply it to tracked
-sources and headers from the source root:
+The repository's `.clang-format` defines the C style, including a blank line
+between function and other definition blocks. Apply it to tracked sources
+and headers from the source root:
 
 ```sh
 git ls-files -z -- '*.c' '*.h' | xargs -0 clang-format -i
