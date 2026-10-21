@@ -257,11 +257,28 @@ sticky flags and both gap policies. Literal raw expectations distinguish
 preserved unnormal storage from a normalized value. Another 192 cases check
 zero memory operands in short/long real and integer formats. Denormal memory
 loads retain their masked guard or unmasked before-operation DE response.
-Negative cases retain guards for reduced/reserved PC, pseudozeros, inconsistent
+Negative cases retain guards for reserved PC, pseudozeros, inconsistent
 tags and excluded exponent edges.
 
 The first new acceptance check failed before the correction. The model-only
-capture campaign adds 3,072 masked register inputs and checks raw result,
+capture campaign includes 3,072 PC64 masked register inputs and checks raw result,
 tags, C1 and untouched storage. None of these files contains original execution
 results. [The investigation](research/UNNORMAL_ZERO_ARITHMETIC.md) explains the
 bounded J2 alignment, normalization and precision path.
+
+The PC24/53 extension adds 2,064,384 register cases and 6,144 memory-zero cases.
+Sixteen literal input/result rows distinguish raw alignment from canonical
+normalization, covering exact values, both ties, neighboring residues, carry
+into the integer bit and zero-rounded fractions. The matrix crosses opcode
+direction, destinations, TOP, signs, rounding, masks, sticky flags and policies.
+It requires the original exponent and VALID tag even for pseudozero output,
+PE for discarded bits and C1 for a magnitude increment. An unmasked PE commits
+the result and pop, sets IR/BUSY and asserts the interrupt when enabled.
+
+The first new acceptance check fails against the previous guard. The full
+`unnormal-zero` campaign now has 15,360 masked inputs. Model replay expectations
+use Python Fraction on the signed raw rounding grid, independently of the C
+bit operations. They check every saved register, tag, status bit and guard.
+The [reduced-precision derivation](research/UNNORMAL_REDUCED_PRECISION.md) records
+why these expectations differ from canonical arithmetic. No physical capture
+has established them as original-chip measurements.

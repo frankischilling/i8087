@@ -281,10 +281,10 @@ static void compare(transaction *t, i8087_f80 a, i8087_f80 b, unsigned pops) {
 }
 
 static bool unnormal_plus_zero(const transaction *t, i8087_f80 a, i8087_f80 b, unsigned a_tag,
-                               unsigned b_tag, sf_result *out) {
+                               unsigned b_tag, unsigned p, unsigned rc, sf_result *out) {
     i8087_f80 raw;
     unsigned exponent;
-    if (((t->f.control >> 8) & 3) != 3 || (t->raised & I8087_DE))
+    if (((t->f.control >> 8) & 3) == 1 || (t->raised & I8087_DE))
         return false;
     if (a_tag == I8087_TAG_ZERO && !a.significand && !(a.sign_exponent & 0x7fff) &&
         b_tag == I8087_TAG_VALID)
@@ -297,10 +297,25 @@ static bool unnormal_plus_zero(const transaction *t, i8087_f80 a, i8087_f80 b, u
     exponent = raw.sign_exponent & 0x7fff;
     if (!sf_unnormal(raw) || !raw.significand || exponent < 0x0041 || exponent > 0x7ffd)
         return false;
-    /* J2 aligns only zero bits and skips normalization. At PC64, J11 has
-       no discarded bits to round. Keep the stored exponent and significand.
-       See research/UNNORMAL_ZERO_ARITHMETIC.md for the bounded source path. */
+    /* J2 aligns only zero bits and skips normalization. J11 rounds the stored
+       alignment at reduced PC, without changing the exponent or VALID tag.
+       See research/UNNORMAL_REDUCED_PRECISION.md for the bounded source path. */
     *out = (sf_result){raw, 0, false, {0}};
+    if (p < 64) {
+        uint64_t unit = UINT64_C(1) << (64 - p);
+        uint64_t residue = raw.significand & (unit - 1);
+        uint64_t half = unit >> 1;
+        bool increment = false;
+        if (rc == 0)
+            increment = residue > half || (residue == half && (raw.significand & unit));
+        else if (rc == 1)
+            increment = residue && sf_sign(raw);
+        else if (rc == 2)
+            increment = residue && !sf_sign(raw);
+        out->value.significand = (raw.significand & ~(unit - 1)) + (increment ? unit : 0);
+        out->flags = residue ? I8087_PE : 0;
+        out->rounded_up = increment;
+    }
     return true;
 }
 
@@ -328,7 +343,7 @@ static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_
         if (sf_kind(a) == SF_INFINITY && sf_kind(b) == SF_INFINITY &&
             !(t->f.control & I8087_AFFINE))
             r = (sf_result){sf_indefinite(), I8087_IE, false, {0}};
-        else if (!unnormal_plus_zero(t, a, b, a_tag, b_tag, &r)) {
+        else if (!unnormal_plus_zero(t, a, b, a_tag, b_tag, p, rc, &r)) {
             if (sf_unnormal(a) || sf_unnormal(b) || sf_denormal(a) || sf_denormal(b))
                 gap(t, I8087_GAP_UNNORMAL);
             r = sf_add(a, b, p, rc);

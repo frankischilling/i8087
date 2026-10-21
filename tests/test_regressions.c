@@ -912,7 +912,7 @@ static void unnormal_zero_arithmetic(void) {
                                     {UINT64_C(0x4000000000000001), 0x4000},
                                     {1, 0x403f},
                                     {UINT64_C(0x7fffffffffffffff), 0x7ffd}};
-    unsigned form, item, top, i, which, sign, zero_sign, rc, masks, sticky, policy, k;
+    unsigned form, item, top, i, which, sign, zero_sign, rc, masks, sticky, policy, k, pc;
     for (form = 0; form < sizeof(forms) / sizeof(forms[0]); ++form)
         for (item = 0; item < sizeof(raw) / sizeof(raw[0]); ++item)
             for (top = 0; top < 8; ++top)
@@ -999,51 +999,232 @@ static void unnormal_zero_arithmetic(void) {
                         }
     }
     /* A denormal memory load retains its before-operation exception handling. */
-    for (form = 0; form < 2; ++form)
-        for (masks = 0; masks < 2; ++masks) {
-            i8087 f, before;
-            i8087_init(&f);
-            slot(&f, 0, (i8087_f80){0, 0}, I8087_TAG_ZERO);
-            if (!masks)
-                f.control &= (uint16_t)~I8087_DE;
-            memset(memory, 0, 8);
-            memory[0] = 1;
-            before = f;
-            CHECK(op(&f, form ? 0xdc : 0xd8, 0x06) ==
-                  (masks ? I8087_UNVERIFIED : I8087_PENDING_INTERRUPT));
-            CHECK(same_registers(&f, &before));
-            if (masks) {
-                CHECK(f.status == before.status);
-                CHECK(f.last_gap & I8087_GAP_UNNORMAL);
-            } else {
-                CHECK((f.status & 0x3f) == I8087_DE);
-                CHECK((f.status & (I8087_IR | I8087_BUSY)) == (I8087_IR | I8087_BUSY));
-                CHECK(f.last_gap == 0);
+    for (pc = 0; pc < 4; ++pc)
+        for (form = 0; form < 2; ++form)
+            for (masks = 0; masks < 2; ++masks) {
+                i8087 f, before;
+                i8087_init(&f);
+                f.control = (uint16_t)((f.control & ~0x0300u) | (pc << 8));
+                slot(&f, 0, (i8087_f80){0, 0}, I8087_TAG_ZERO);
+                if (!masks)
+                    f.control &= (uint16_t)~I8087_DE;
+                memset(memory, 0, 8);
+                memory[0] = 1;
+                before = f;
+                CHECK(op(&f, form ? 0xdc : 0xd8, 0x06) ==
+                      (masks ? I8087_UNVERIFIED : I8087_PENDING_INTERRUPT));
+                CHECK(same_registers(&f, &before));
+                if (masks) {
+                    CHECK(f.status == before.status);
+                    CHECK(f.last_gap & I8087_GAP_UNNORMAL);
+                } else {
+                    CHECK((f.status & 0x3f) == I8087_DE);
+                    CHECK((f.status & (I8087_IR | I8087_BUSY)) == (I8087_IR | I8087_BUSY));
+                    CHECK(f.last_gap == 0);
+                }
             }
+    /* Reserved PC, range edges, pseudozero and wrong tags stay guarded. */
+    for (pc = 0; pc < 4; ++pc)
+        for (item = 0; item < 7; ++item) {
+            i8087 f, before;
+            i8087_f80 x = raw[2];
+            i8087_init(&f);
+            f.control = (uint16_t)((f.control & ~0x0300u) | (pc << 8));
+            if (item == 0)
+                f.control = 0x01bf;
+            else if (item == 1)
+                x.sign_exponent = 0x0040;
+            else if (item == 2)
+                x.sign_exponent = 0x7ffe;
+            else if (item == 3)
+                x.significand = 0;
+            else if (item == 4)
+                x.sign_exponent = 0;
+            slot(&f, 0, x, item == 5 ? I8087_TAG_SPECIAL : I8087_TAG_VALID);
+            slot(&f, 1, (i8087_f80){0, 0}, item == 6 ? I8087_TAG_VALID : I8087_TAG_ZERO);
+            before = f;
+            CHECK(op(&f, 0xd8, 0xc1) == I8087_UNVERIFIED);
+            CHECK(same_registers(&f, &before));
+            CHECK(f.status == before.status);
+            CHECK(f.last_gap & I8087_GAP_UNNORMAL);
         }
-    /* Reduced/reserved PC, range edges, pseudozero and wrong tags stay guarded. */
-    for (item = 0; item < 9; ++item) {
-        i8087 f, before;
-        i8087_f80 x = raw[2];
-        i8087_init(&f);
-        if (item < 3)
-            f.control = (uint16_t)(0x00bf | (item << 8));
-        else if (item == 3)
-            x.sign_exponent = 0x0040;
-        else if (item == 4)
-            x.sign_exponent = 0x7ffe;
-        else if (item == 5)
-            x.significand = 0;
-        else if (item == 6)
-            x.sign_exponent = 0;
-        slot(&f, 0, x, item == 7 ? I8087_TAG_SPECIAL : I8087_TAG_VALID);
-        slot(&f, 1, (i8087_f80){0, 0}, item == 8 ? I8087_TAG_VALID : I8087_TAG_ZERO);
-        before = f;
-        CHECK(op(&f, 0xd8, 0xc1) == I8087_UNVERIFIED);
-        CHECK(same_registers(&f, &before));
-        CHECK(f.status == before.status);
-        CHECK(f.last_gap & I8087_GAP_UNNORMAL);
-    }
+}
+
+/* Literal J11 raw-grid results, not canonical floating-point quantization. */
+static const struct {
+    unsigned pc;
+    uint64_t input, lower, upper, nearest;
+} reduced_zero_cases[] = {
+    {0, UINT64_C(0x4000010000000000), UINT64_C(0x4000010000000000), UINT64_C(0x4000010000000000),
+     UINT64_C(0x4000010000000000)},
+    {0, UINT64_C(0x4000007fffffffff), UINT64_C(0x4000000000000000), UINT64_C(0x4000010000000000),
+     UINT64_C(0x4000000000000000)},
+    {0, UINT64_C(0x4000008000000000), UINT64_C(0x4000000000000000), UINT64_C(0x4000010000000000),
+     UINT64_C(0x4000000000000000)},
+    {0, UINT64_C(0x4000018000000000), UINT64_C(0x4000010000000000), UINT64_C(0x4000020000000000),
+     UINT64_C(0x4000020000000000)},
+    {0, UINT64_C(0x4000008000000001), UINT64_C(0x4000000000000000), UINT64_C(0x4000010000000000),
+     UINT64_C(0x4000010000000000)},
+    {0, UINT64_C(0x7fffff8000000000), UINT64_C(0x7fffff0000000000), UINT64_C(0x8000000000000000),
+     UINT64_C(0x8000000000000000)},
+    {0, UINT64_C(0x0000008000000000), UINT64_C(0), UINT64_C(0x0000010000000000), UINT64_C(0)},
+    {0, UINT64_C(0x0000008000000001), UINT64_C(0), UINT64_C(0x0000010000000000),
+     UINT64_C(0x0000010000000000)},
+    {2, UINT64_C(0x4000000000000800), UINT64_C(0x4000000000000800), UINT64_C(0x4000000000000800),
+     UINT64_C(0x4000000000000800)},
+    {2, UINT64_C(0x40000000000003ff), UINT64_C(0x4000000000000000), UINT64_C(0x4000000000000800),
+     UINT64_C(0x4000000000000000)},
+    {2, UINT64_C(0x4000000000000400), UINT64_C(0x4000000000000000), UINT64_C(0x4000000000000800),
+     UINT64_C(0x4000000000000000)},
+    {2, UINT64_C(0x4000000000000c00), UINT64_C(0x4000000000000800), UINT64_C(0x4000000000001000),
+     UINT64_C(0x4000000000001000)},
+    {2, UINT64_C(0x4000000000000401), UINT64_C(0x4000000000000000), UINT64_C(0x4000000000000800),
+     UINT64_C(0x4000000000000800)},
+    {2, UINT64_C(0x7ffffffffffffc00), UINT64_C(0x7ffffffffffff800), UINT64_C(0x8000000000000000),
+     UINT64_C(0x8000000000000000)},
+    {2, UINT64_C(0x0000000000000400), UINT64_C(0), UINT64_C(0x0000000000000800), UINT64_C(0)},
+    {2, UINT64_C(0x0000000000000401), UINT64_C(0), UINT64_C(0x0000000000000800),
+     UINT64_C(0x0000000000000800)}};
+
+static i8087_f80 reduced_zero_expected(unsigned item, uint16_t exponent, unsigned rc,
+                                       bool *increment, bool *inexact) {
+    uint64_t fraction = reduced_zero_cases[item].lower;
+    if (rc == 0)
+        fraction = reduced_zero_cases[item].nearest;
+    else if ((rc == 1 && (exponent & 0x8000)) || (rc == 2 && !(exponent & 0x8000)))
+        fraction = reduced_zero_cases[item].upper;
+    *inexact = reduced_zero_cases[item].lower != reduced_zero_cases[item].upper;
+    *increment = *inexact && fraction == reduced_zero_cases[item].upper;
+    return (i8087_f80){fraction, exponent};
+}
+
+static void unnormal_zero_reduced_precision(void) {
+    static const struct {
+        uint8_t esc, base;
+        unsigned negative_slot;
+        bool destination_i, pop;
+    } forms[] = {
+        {0xd8, 0xc0, 2, false, false}, {0xd8, 0xe0, 1, false, false}, {0xd8, 0xe8, 0, false, false},
+        {0xdc, 0xc0, 2, true, false},  {0xdc, 0xe0, 1, true, false},  {0xdc, 0xe8, 0, true, false},
+        {0xde, 0xc0, 2, true, true},   {0xde, 0xe0, 1, true, true},   {0xde, 0xe8, 0, true, true}};
+
+    unsigned item, form, top, i, which, sign, zero_sign, rc, masks, sticky, policy, k;
+    for (item = 0; item < sizeof(reduced_zero_cases) / sizeof(reduced_zero_cases[0]); ++item)
+        for (form = 0; form < sizeof(forms) / sizeof(forms[0]); ++form)
+            for (top = 0; top < 8; ++top)
+                for (i = 1; i < 8; ++i)
+                    for (which = 0; which < 2; ++which)
+                        for (sign = 0; sign < 2; ++sign)
+                            for (zero_sign = 0; zero_sign < 2; ++zero_sign)
+                                for (rc = 0; rc < 4; ++rc)
+                                    for (masks = 0; masks < 2; ++masks)
+                                        for (sticky = 0; sticky < 2; ++sticky)
+                                            for (policy = 0; policy < 2; ++policy) {
+                                                i8087 f, expected;
+                                                bool increment, inexact, interrupt;
+                                                uint16_t exponent =
+                                                    (uint16_t)((sign << 15) | (i == 1   ? 0x0041
+                                                                               : i == 7 ? 0x7ffd
+                                                                                        : 0x4000));
+                                                i8087_f80 x = {reduced_zero_cases[item].input,
+                                                               exponent},
+                                                          want;
+                                                unsigned dest = forms[form].destination_i ? i : 0;
+                                                unsigned count = writes;
+                                                i8087_init(&f);
+                                                f.control =
+                                                    (uint16_t)(0x1000 |
+                                                               (reduced_zero_cases[item].pc << 8) |
+                                                               (rc << 10) | (masks ? 0x3f : 0));
+                                                f.status = (uint16_t)((top << 11) | CC |
+                                                                      (sticky ? 0x3f : 0));
+                                                i8087_set_policy(&f,
+                                                                 policy ? I8087_ALLOW_APPROXIMATION
+                                                                        : I8087_STOP_ON_UNVERIFIED);
+                                                for (k = 0; k < 8; ++k)
+                                                    number(&f, k, integer((int)k + 11));
+                                                slot(&f, which ? i : 0, x, I8087_TAG_VALID);
+                                                slot(&f, which ? 0 : i,
+                                                     (i8087_f80){0, (uint16_t)(zero_sign << 15)},
+                                                     I8087_TAG_ZERO);
+                                                expected = f;
+                                                if (forms[form].negative_slot == which)
+                                                    exponent ^= 0x8000;
+                                                want = reduced_zero_expected(item, exponent, rc,
+                                                                             &increment, &inexact);
+                                                interrupt = inexact && !masks;
+                                                slot(&expected, dest, want, I8087_TAG_VALID);
+                                                expected.status =
+                                                    (uint16_t)((expected.status & ~I8087_C1) |
+                                                               (increment ? I8087_C1 : 0) |
+                                                               (inexact ? I8087_PE : 0) |
+                                                               (interrupt ? I8087_IR | I8087_BUSY
+                                                                          : 0));
+                                                if (forms[form].pop) {
+                                                    expected.tags |= (uint16_t)(3u << (2 * top));
+                                                    expected.status =
+                                                        (uint16_t)((expected.status & 0xc7ffu) |
+                                                                   (((top + 1) & 7) << 11));
+                                                }
+                                                CHECK(op(&f, forms[form].esc,
+                                                         (uint8_t)(forms[form].base + i)) ==
+                                                      (interrupt ? I8087_PENDING_INTERRUPT
+                                                                 : I8087_OK));
+                                                CHECK(same_registers(&f, &expected));
+                                                CHECK(f.status == expected.status);
+                                                CHECK(f.control == expected.control);
+                                                CHECK(f.last_gap == 0);
+                                                CHECK(f.used_approximations == 0);
+                                                CHECK(i8087_interrupt_asserted(&f) == interrupt);
+                                                CHECK(f.instruction_address == 0x12345);
+                                                CHECK(f.opcode ==
+                                                      (uint16_t)(((forms[form].esc & 7u) << 8) |
+                                                                 (forms[form].base + i)));
+                                                CHECK(writes == count);
+                                            }
+    /* The same literal results apply after a canonical memory zero load. */
+    for (item = 0; item < sizeof(reduced_zero_cases) / sizeof(reduced_zero_cases[0]); ++item)
+        for (form = 0; form < 4; ++form)
+            for (i = 0; i < 3; ++i)
+                for (sign = 0; sign < 2; ++sign)
+                    for (zero_sign = 0; zero_sign < 2; ++zero_sign)
+                        for (rc = 0; rc < 4; ++rc)
+                            for (masks = 0; masks < 2; ++masks) {
+                                static const uint8_t escapes[] = {0xd8, 0xdc, 0xda, 0xde};
+                                i8087 f, expected;
+                                bool increment, inexact;
+                                uint16_t exponent = (uint16_t)(0x4000 | ((sign ^ (i == 2)) << 15));
+                                i8087_f80 want =
+                                    reduced_zero_expected(item, exponent, rc, &increment, &inexact);
+                                unsigned count = writes;
+                                i8087_init(&f);
+                                f.control = (uint16_t)(0x1000 | (reduced_zero_cases[item].pc << 8) |
+                                                       (rc << 10) | (masks ? 0x3f : 0));
+                                f.status = CC | I8087_UE;
+                                slot(&f, 0,
+                                     (i8087_f80){reduced_zero_cases[item].input,
+                                                 (uint16_t)(0x4000 | (sign << 15))},
+                                     I8087_TAG_VALID);
+                                memset(memory, 0, 8);
+                                if (form < 2)
+                                    memory[form ? 7 : 3] = (uint8_t)(zero_sign << 7);
+                                expected = f;
+                                slot(&expected, 0, want, I8087_TAG_VALID);
+                                expected.status =
+                                    (uint16_t)((expected.status & ~I8087_C1) |
+                                               (increment ? I8087_C1 : 0) |
+                                               (inexact ? I8087_PE : 0) |
+                                               (inexact && !masks ? I8087_IR | I8087_BUSY : 0));
+                                CHECK(op(&f, escapes[form],
+                                         (uint8_t)(i == 0   ? 0x06
+                                                   : i == 1 ? 0x26
+                                                            : 0x2e)) ==
+                                      (inexact && !masks ? I8087_PENDING_INTERRUPT : I8087_OK));
+                                CHECK(same_registers(&f, &expected));
+                                CHECK(f.status == expected.status);
+                                CHECK(f.last_gap == 0);
+                                CHECK(writes == count);
+                            }
 }
 
 int main(void) {
@@ -1059,6 +1240,7 @@ int main(void) {
     exponential_signed_zero();
     alternate_register_encodings();
     unnormal_zero_arithmetic();
+    unnormal_zero_reduced_precision();
     printf(
         "PASS: %lu original-8087 regression assertions (document-derived, not hardware captures)\n",
         checks);

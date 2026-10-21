@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Parser/provenance round trips, NOT hardware-accuracy tests."""
 from pathlib import Path
+from fractions import Fraction
 import subprocess
 import struct
 import sys
@@ -242,7 +243,7 @@ def main():
                                   capture_output=True).returncode != 0
             tests += 1
         unnormal, labels = make_cases("unnormal-zero")
-        assert len(unnormal) == len(labels) == 3072
+        assert len(unnormal) == len(labels) == 15360
         unnormal_src, unnormal_dst = directory / "unnormal-input.bin", directory / "unnormal-model.bin"
         write_trace(unnormal_src, INPUT_MAGIC, unnormal)
         subprocess.run([replay, str(unnormal_src), str(unnormal_dst)], check=True, capture_output=True)
@@ -256,9 +257,18 @@ def main():
             exponent, significand = old[int(zero_first)]
             if (query[1] == 0xE1 and zero_first) or (query[1] == 0xE9 and not zero_first):
                 exponent ^= 0x8000
-            assert registers[0] == (exponent, significand)
+            control, = struct.unpack_from("<H", query, 2)
+            pc = (24, None, 53, 64)[(control >> 8) & 3]
+            rc = (control >> 10) & 3
+            unit = 2 ** (64 - pc)
+            exact = Fraction(significand, unit) * (-1 if exponent & 0x8000 else 1)
+            rounded = (round(exact) if rc == 0 else exact // 1 if rc == 1 else
+                       -((-exact) // 1) if rc == 2 else int(exact))
+            inexact = rounded != exact
+            increment = abs(rounded) > abs(exact)
+            assert registers[0] == (exponent, abs(rounded) * unit)
             assert registers[1:] == old[1:]
-            assert sw == initial_sw & ~0x200
+            assert sw == (initial_sw & ~0x200) | (0x20 if inexact else 0) | (0x200 if increment else 0)
             assert tags == initial_tags & ~(3 << (2 * top))
         tests += 1
     print(f"PASS: {tests} trace-tool scenarios; {len(records)} smoke and {len(rounding)} FRNDINT model-only round trips; no hardware evidence")
