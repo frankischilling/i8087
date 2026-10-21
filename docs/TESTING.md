@@ -325,16 +325,12 @@ resolved arithmetic branches from remaining range completion. The
 random cases include distances through 32,700. No original-hardware output has
 been supplied for this work.
 
-The FPREM regression adds 98,304 cases with stored exponent differences of
-64, 65 and 66 but numerically small unnormal dividends. The previous core
-incorrectly accepted a normalized zero as a completed step; the new guard
-check fails against that behavior. Strict mode preserves all state and
-reports the unresolved partial path. Opt-in fallback remains labeled and
-sets C2 even when its value is zero. PC/RC, TOP, old quotient flags, both
-signs, old C2 and sticky flags are crossed. This verifies the decoded outer
-selection and the remaining short partial-history guard. The numerical
-fallback now uses the original reduction count; those cases still cannot
-establish C0/C1/C3 in strict mode.
+The FPREM regression crosses 98,304 cases with stored distances of 64, 65
+and 66 but numerically small unnormal dividends. It checks a zero partial
+result with C2 still set and the source-derived short-chunk history. Both
+policies produce the same raw state without an approximation marker. PC/RC,
+TOP, old quotient flags, both signs, old C2 and sticky flags are crossed.
+The acceptance check fails against the earlier strict partial guard.
 
 ## Original remainder datapath
 
@@ -344,37 +340,49 @@ The separate C subsystem computes `divmod(S_A * 2^k, S_B)` with
 point or a compiler-specific wide integer. A negative distance bypasses division
 and normalizes the dividend. The result keeps the dividend sign and C2 follows
 the stored long-count branch even if the fraction becomes zero. PC and RC do
-not shorten the remainder. Tiny-result completion retains its range guard.
+not shorten the remainder. Exact tiny results use a full-width masked
+denormal or the original unmasked exponent adjustment.
 
 The `original_remainder_datapath` suite crosses 14 literal cases through
 917,504 executions: both signs, all PC/RC fields, TOP, old quotient history,
 old C2, sticky flags, masks and both policies. It checks every raw register,
 tags, full status/control, saved instruction and opcode, interrupt state and
 guard reporting. Another 4,096 sequences perform five successive reductions
-through completion, checking 20,480 intermediate states. A tiny-result control
-checks range rejection and rollback. The first acceptance test fails against
+through completion, checking 20,480 intermediate states. The first acceptance test fails against
 the earlier instruction core, which guarded every normal partial reduction.
 
-The `original_remainder_integer_oracle` suite checks 30,000 seeded cases and
-128 complete sequences, totaling 48,869 input states. Python integer `divmod`
-and `bit_length` determine each result independently of the C serial divider.
-Exact Fractions separately check the final mathematical remainder. Every
-state is replayed with strict and opt-in policies, including 6,434 short
-partial-history guards. The test checks raw payloads, tags, every status bit,
-control and unchanged sentinel registers. Long sequences cover stored
-distances through 32,700 and assert at least a 63-place reduction for each
-nonzero partial result.
+Six paired literal cases cross completed D=63 against partial distances
+64, 65, 127 and 128, totaling 491,520 executions. Fractions, dividend exponent
+and old history stay the same while the divisor exponent changes. Cases
+cover chunks Q=0, 1, 2 and 3, zero and nonzero remainders and pseudozero inputs.
+The expected remainder and H update are the same across each pair; C2 differs.
+[The divider-control derivation](research/FPREM_DIVIDER_CONTROLS.md) audits
+the actual path dependencies. Partial C0/C1/C3 remain a source-derived
+inference for bits Intel labels undefined, rather than a measured chip result.
 
-Completed quotient history follows Intel Table 4b, including unnormal dividends
-whose stored distance exceeds their numerical quotient length. A partial
-quotient with at least three significant bits replaces the old history.
-For fewer bits, strict mode preserves state and reports the remaining gap;
-opt-in mode preserves the old C0/C1/C3 while delivering the original numerical
-remainder and C2. That partial-history choice is explicitly unverified. See
-[the divider-control derivation](research/FPREM_DIVIDER_CONTROLS.md).
+Five tiny-result literals cross 327,680 executions with normal and unnormal
+dividends, a negative stored distance, a partial result, signs, PC/RC, TOP,
+old history, sticky flags, exception masks, global interrupt masking and both
+policies. Masked results are full-width SPECIAL-tag denormals; unmasked
+results keep the normalized fraction with the original exponent adjustment.
+Both raise UE without fresh PE, preserve other registers and complete quotient
+flags. The first check fails against the earlier tiny-result guard.
+[The exact-grid proof](research/FPREM_TINY_RESULTS.md) explains why the
+denormalizing shift cannot discard a nonzero bit.
+
+The `original_remainder_integer_oracle` suite checks 30,000 seeded ordinary
+cases, 12,000 exact tiny-result cases and 128 complete sequences, totaling
+55,316 input states in the recorded run. Python
+integer `divmod` and `bit_length` determine each result independently of the
+C serial divider. Exact Fractions separately check the final mathematical
+remainder. Every input is replayed with strict and opt-in policies; neither
+uses an approximation on this supported path. The test compares raw payloads,
+tags, every status bit, control and unchanged sentinel registers. Long
+sequences cover stored distances through 32,700 and assert at least a 63-place
+reduction for every nonzero partial result.
 
 All ten suites passed locally with GCC and MSVC on Windows and Clang with
 ASan/UBSan under Linux. The direct C demo, formatting check and diff check also
-passed. CI requires all ten suites. Hosted checks must pass on the final pull request
-head. Physical hardware is optional corroboration and is not a prerequisite
+passed. CI requires all ten suites. Hosted checks must pass on the final pull
+request head. Physical hardware is optional corroboration and is not a prerequisite
 for completing source-backed work.

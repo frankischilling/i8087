@@ -9,11 +9,15 @@ integer implementation can produce the remainder without reproducing every
 nanomachine control signal. This is a source-derived reconstruction, not a
 silicon capture or a cycle-count derivation.
 
-For completed reductions, Intel directly specifies the quotient condition-code
-history by dividend range. That contract also supplies an implementable rule
-for a finite unnormal dividend. The physical handling of leading zero quotient
-trials is less certain, especially for architecturally undefined partial-step
-condition codes. Keep that distinction visible.
+Intel directly specifies completed quotient history by dividend range. A
+paired-path comparison transfers that rule to partial reductions, including
+unnormal dividends whose generated quotient is zero, one, two or three. Both
+paths run the same fraction divider with count 63. The differences in the
+exponent converter, general shift count and C2 do not supply an identified
+input to quotient generation or extraction. This supports an implementable
+history rule without requiring a reconstruction of every quotient latch.
+Partial C0/C1/C3 remain architecturally undefined, so distinguish this
+source-derived hardware inference from Intel's completed-result contract.
 
 ## Why the count is 63
 
@@ -151,23 +155,137 @@ H equal to three. Shifting history once for each of the 64 arithmetic trial
 positions would instead erase the history. This discriminates functional
 quotient history from the raw divider's arithmetic iteration count.
 
-## Partial condition codes and what is still an inference
+## Partial quotient history from paired paths
 
-The tail always transfers quotient-register output into C1/C3/C0, including
-after a partial reduction. Intel Table 4a labels these three bits undefined
-when C2 is one. A long reduction with a normal dividend produces at least 63
-significant quotient bits, so any old three-bit history has shifted away and
-the generated chunk's low bits are the natural reconstruction. For an unnormal
-dividend, a long-count path can instead produce Q zero or one. The public
-sources above do not independently prove whether every leading zero trial,
-only the first, or none before the first one shifts the retained history.
+Compare two finite, correctly tagged VALID inputs with the same stored E_A,
+fractions A and B, signs, control word and old H. B is normalized and nonzero.
+Choose E_B so the first instruction has D equal to 63, and the second has D
+at least 64. Keeping E_A fixed also makes their result exponent bookkeeping
+equal. The first instruction is completed and therefore has Table 4b's
+explicit history rule. The second takes the capped partial path.
+For this comparison, hold the other preinstruction state fixed as well;
+old H is not an assertion that the entire quotient register has been decoded.
+Table 4b defines the completed output without requiring such a decode.
 
-Use the explicit completed rule for completed cases. For partial cases, label
-any chosen deterministic C0/C1/C3 reconstruction as an inference and test it
-separately from exact R and C2. Do not present a mathematical modulo oracle as
-proof of the internal quotient-latch history. Resolving that physical detail
-does not require access to a chip; a circuit-level derivation or a stronger
-published control decode would also suffice.
+The relevant state comparison is:
+
+| State or control | Completed D = 63 | Partial D >= 64 | Effect after the paths join |
+| --- | --- | --- | --- |
+| C2 | Cleared at `#1586`. | Cleared, then set at `#1616`. | No subsequent FPREM branch reads C2. |
+| Stored tmpB exponent | E_A minus 63. | E_A minus D. | `#1625` reads only fraction B; the exponent is not read again. |
+| Exponent converter | D = 63 at `#1608`. | D >= 64 at `#1608`. | The difference survives into division and needs the separate audit below. |
+| Internal D-zero flag | Clear. | Clear. | Both skip `#1612` and execute `#1628`. |
+| Reduction amount in B | 63 through `#1613`. | 63 through `#1615` and `#1617`. | Same subtraction at `#1618`. |
+| tmpA exponent | E_A minus 63 after `#1619`. | E_A minus 63 after `#1619`. | Same result exponent before normalization. |
+| General barrel shift-count register | May retain an old count. | Written with 63 at `#1615`. | The fraction divider uses specialized shifting; later extraction selects immediate 3. |
+| Divider loop counter | 62 after `#1623`. | 62 after `#1623`. | Same hardware loop bound. |
+| Sum, sign and GRS inputs | Loaded from fraction A at `#1624`. | Same load. | Earlier exponent-arithmetic sums are replaced. |
+| B fraction and GRS input | Loaded from fraction B at `#1625`. | Same load. | Earlier count values in B are replaced. |
+| Divider controls | `6b48`, `52c0`, `f40c`, `524b`, `5244`. | Identical sequence. | Same fraction calculation and quotient-generation controls. |
+
+The differing prefix has no identified quotient-register write or C0/C1/C3
+write. It selects a count, sets C2 and returns that count to B. Its transient
+bus values are replaced by the common exponent arithmetic and operand loads.
+Thus both paths present the same quotient-relevant initial state and inputs
+to the common divider sequence. This is a functional dependency argument;
+it does not assert that every internal latch has the same value.
+[Count selection through divider invocation](https://github.com/a-mcego/granite/blob/745f0a9c6d4fdfc1b5d6c41b6ae0d2a98a4be03d/tools/8087mc/bin/8087mc_out.txt#L1607),
+[fraction sources, loop counter and BC status writers](https://github.com/shirriff/granite/blob/2f52a129ef0d2dc51be9e874beeab06e3d9b6d6b/tools/8087mc/bin/8087.md#L16).
+
+### Why the surviving exponent difference does not change the quotient
+
+Intel's original division description supplies the dependency needed here:
+the sign of the sum selects the next add or subtract, and its inverse enters
+the quotient register. Its modulus variation changes the number of cycles.
+The recovered program has already converted D into the same capped count
+and counter in both cases. The separate exponent converter is not an operand
+of that fraction calculation.
+[Intel US4338675A, figure 7 and arithmetic sections B and C](https://patents.google.com/patent/US4338675A/en).
+
+This separation also agrees with the die analysis: fraction-bus input and B
+feed the adder; the divider accumulates quotient bits in its own register and
+uses a hardware inner loop. The general barrel shifter is not the divider's
+specialized shifter. Therefore the long prefix's register-zero write is not
+an extra divider shift or a second divider loop bound.
+[First-hand adder and divider analysis](https://www.righto.com/2026/06/intel-8087-adder-reverse-engineered.html),
+[first-hand shifter analysis, note 8](https://www.righto.com/2020/05/die-analysis-of-8087-math-coprocessors.html).
+
+The exponent converter does affect some rounding-bit operations, so it would
+be incorrect to discard its difference merely because FPREM is exact. The
+first-hand FSCALE analysis identifies that dependency for the special
+rounding(H/h) operations. FPREM's common divider block and quotient extraction
+do not execute those operations. They load the same fraction/GRS operands,
+use the same divider controls, then select the quotient register directly.
+[Exponent-dependent rounding operations, note 17 and J20/J11 listings](https://www.righto.com/2026/09/8087-microcode-reverse-engineering-fscale.html).
+
+For a nonzero R, J21 computes a normalization count from that same R, replacing
+the old general shift count. `#1639` computes the same corrected exponent and
+`#1640` overwrites the exponent converter before the range test. For R equal
+to zero, `#1633` through `#1636` instead construct the same signed zero and
+bypass that overwrite. In that case expConv still differs, but `#1643` uses
+an immediate three-place shift of the quotient register. `#1644` transfers
+its output to the sum/GRS register, and `#1645` writes bits 0, 1 and 2 to C1,
+C3 and C0. This path has no exponent-converter condition or rounding(H/h)
+operation. General-count retention therefore does not distinguish the zero
+tail either.
+[J21 normalization words](https://github.com/a-mcego/granite/blob/745f0a9c6d4fdfc1b5d6c41b6ae0d2a98a4be03d/tools/8087mc/bin/8087mc_out.txt#L802),
+[zero, nonzero and quotient-extraction tails](https://github.com/a-mcego/granite/blob/745f0a9c6d4fdfc1b5d6c41b6ae0d2a98a4be03d/tools/8087mc/bin/8087mc_out.txt#L1633),
+[immediate shift and status-write fields](https://github.com/shirriff/granite/blob/2f52a129ef0d2dc51be9e874beeab06e3d9b6d6b/tools/8087mc/bin/8087.md#L132).
+
+The original fraction-bus patent independently places quotient assembly in
+the fraction datapath, with the inverted sum sign entering the quotient
+shift register. Its exponent control determines numerical scale separately.
+This supplies a concrete circuit boundary for the equivalence, rather than
+an assumption that unspecified logic has no effect.
+[Intel US4484259A, figure 7 and division description](https://patents.google.com/patent/US4484259A/en).
+
+### Implementable rule and evidence limit
+
+Apply the same three-way H update given above to the generated chunk
+`Q = floor(A * 2^63 / B)` on the partial path, while keeping C2 set. In
+particular, Q zero or one shifts old H once, and Q two or three shifts it
+twice. Leading zero arithmetic positions do not independently erase old H.
+For Q at least four, the chunk's low three bits replace it.
+
+This follows by transferring Intel's completed D=63 contract across the same
+fraction-divider and extraction path. It is stronger than choosing a
+convenient deterministic value for undefined bits. It remains a source-derived
+inference for partial C0/C1/C3 because Intel Table 4a deliberately leaves them
+undefined. A contradictory capture or an identified exponent/C2 input to the
+divider or quotient write enable would require revising the rule. None of
+the inspected control words, original datapath descriptions or first-hand
+decode supplies such a dependency. A full transistor netlist or a physical
+capture is not needed to implement this supported reconstruction, and this
+argument does not establish electrical behavior or divider timing.
+
+Keep exceptional input paths and tiny-result range completion outside this
+equivalence. On the in-range paired paths, both instructions take the same
+zero or normalization tail. The long prefix executes extra microinstructions,
+so equal fraction behavior also does not imply equal instruction timing.
+
+### Literal paired cases
+
+Use VALID dividend exponent `4040` and normalized divisor fraction
+`c000000000000000`. Divisor exponent `4001` gives completed D=63; changing
+only that exponent to `4000`, `3fff`, `3fc1` or `3fc0` gives partial D=64,
+65, 127 or 128. For every row below the paired result payload is the
+same, apart from the retained dividend sign; C2 is zero for the completed
+case and one for the partial cases.
+
+| Dividend fraction A | Chunk Q | Integer R | Normalized result | H with old H = 5 |
+| --- | --- | --- | --- | --- |
+| `0000000000000000` | 0 | 0 | Signed canonical zero. | 2 |
+| `0000000000000001` | 0 | `8000000000000000` | `4001:8000000000000000` | 2 |
+| `0000000000000002` | 1 | `4000000000000000` | `4000:8000000000000000` | 3 |
+| `0000000000000003` | 2 | 0 | Signed canonical zero. | 6 |
+| `0000000000000004` | 2 | `8000000000000000` | `4001:8000000000000000` | 6 |
+| `0000000000000005` | 3 | `4000000000000000` | `4000:8000000000000000` | 7 |
+
+The first row is a VALID pseudozero, not a ZERO-tag shortcut. Repeat these
+pairs for every old H, both signs of each operand, both initial C2 values and
+all precision/rounding controls. The completed member tests Intel's Table 4b;
+the partial member tests the source-derived equivalence. Integer divmod
+alone checks neither member's history behavior against hardware.
 
 ## Software checks for the reconstruction
 
@@ -182,23 +300,26 @@ Implementation tests should keep literal count-boundary cases at D 0, 1, 62,
 63, 64, 65 and 128, both signs, raw unnormal dividends, all old H values and
 both initial C2 values. Compare every intermediate normalized remainder and
 C2 against the capped integer model, then test completed history directly
-against Table 4b. Keep tiny-result exception completion and invalid divisors
-separate from this finite normalized-divisor derivation.
+against Table 4b and partial history against the paired D=63 cases. Keep
+tiny-result exception completion and invalid divisors separate from this
+finite normalized-divisor derivation.
 
 ## Implementation checkpoint
 
 `src/original_remainder.c` implements this finite reconstruction with a separate
 carry bit and unsigned 64-bit remainder. It normalizes the result after every
 step and reports C2 from stored D. The instruction layer accepts correctly
-tagged finite VALID dividends, including unnormals and pseudozeros, and normal finite
-divisors. Completed history uses Table 4b. Partial history is accepted when at
-least three significant quotient bits replace the old history; shorter partial
-quotients remain guarded. The opt-in response then keeps old C0/C1/C3 while
-using the original numerical remainder and C2. That deterministic choice is
-not evidence for the hidden latch behavior.
+tagged finite VALID dividends, including unnormals and pseudozeros, and normal
+finite divisors. Completed history uses Table 4b. Partial history follows the
+same H update through the paired-path derivation above, including chunks with
+fewer than three significant quotient bits. Both policies complete this
+source-derived path without a partial-remainder guard.
 
-Tiny-result range completion remains guarded. Zero, exceptional and unsupported
-input handling stays in the instruction layer. This is a numerical/state
+The private result retains a signed normalized exponent for
+[tiny-result completion](FPREM_TINY_RESULTS.md). Masked output is an exact
+full-width denormal; unmasked output uses the original exponent adjustment.
+Both raise UE without fresh PE and complete quotient flags. Zero, exceptional
+and unsupported input handling stays in the instruction layer. This is a numerical/state
 implementation; it does not implement the divider's cycle timing.
 [Validation and independent references](../TESTING.md#original-remainder-datapath)
 cover literal states, exact integer comparisons and complete reduction sequences.
@@ -207,6 +328,6 @@ An input pseudozero is VALID and follows the unnormal path, including stored
 count selection even with a zero fraction. Its result is canonical signed
 zero, and a long selected path still sets C2. Intel's pseudozero rules treat
 it as unnormal for this operation; no zero-tag shortcut applies. The literal
-matrix checks completed and guarded long-count pseudozeros. The long-count
+matrix checks completed and long-count pseudozeros. The long-count
 acceptance check fails against the earlier canonical-zero bypass.
 [Intel pseudozero rules, S-72](https://archive.org/download/bitsavers_inteldataBrsManual_57011881/1981_iAPX_86_88_Users_Manual.pdf#page=755).

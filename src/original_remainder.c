@@ -11,7 +11,7 @@ original_remainder_status original_remainder(i8087_f80 a, i8087_f80 b,
     unsigned count = distance < 0 ? 0u : distance >= 64 ? 63u : (unsigned)distance;
     unsigned i;
     *out = (original_remainder_result){
-        {0, (uint16_t)(a.sign_exponent & 0x8000)}, 0, 1, distance >= 64};
+        {0, (uint16_t)(a.sign_exponent & 0x8000)}, 0, 1, distance >= 64, 0};
     if (distance >= 0) {
         /* One same-position trial followed by count shifted trials computes
            divmod(S_A * 2^count, S_B). A normalized divisor bounds S_A < 2*S_B. */
@@ -37,12 +37,11 @@ original_remainder_status original_remainder(i8087_f80 a, i8087_f80 b,
             remainder <<= 1;
             --exponent;
         }
+        out->value.significand = remainder;
+        out->exponent = exponent;
         if (exponent < 1)
             return ORIGINAL_REMAINDER_RANGE;
-        out->value.significand = remainder;
         out->value.sign_exponent |= (uint16_t)exponent;
     }
-    /* Three significant quotient bits replace the entire old CC history.
-       A long-count unnormal with fewer bits has unresolved latch history. */
-    return out->partial && quotient < 4 ? ORIGINAL_REMAINDER_HISTORY : ORIGINAL_REMAINDER_COMPLETE;
+    return ORIGINAL_REMAINDER_COMPLETE;
 }

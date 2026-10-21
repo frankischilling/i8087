@@ -1261,26 +1261,21 @@ static void remainder_stored_exponent_selection(void) {
                                                                                         << 15))},
                                                  I8087_TAG_VALID);
                                             before = expected = f;
-                                            if (policy) {
-                                                slot(&expected, 0,
-                                                     (i8087_f80){0, (uint16_t)(sign << 15)},
-                                                     I8087_TAG_ZERO);
-                                                expected.status |= I8087_C2;
-                                            }
-                                            CHECK(op(&f, 0xd9, 0xf8) ==
-                                                  (policy ? I8087_OK : I8087_UNVERIFIED));
+                                            slot(&expected, 0,
+                                                 (i8087_f80){0, (uint16_t)(sign << 15)},
+                                                 I8087_TAG_ZERO);
+                                            expected.status =
+                                                (uint16_t)((expected.status & ~CC) | I8087_C2 |
+                                                           cc_from_q(((history << 1) | 1) & 7));
+                                            CHECK(op(&f, 0xd9, 0xf8) == I8087_OK);
                                             CHECK(same_registers(&f, &expected));
                                             CHECK(f.status == expected.status);
                                             CHECK(f.control == expected.control);
-                                            CHECK(f.last_gap == I8087_GAP_PARTIAL_REMAINDER);
-                                            CHECK(f.used_approximations ==
-                                                  (policy ? (uint32_t)I8087_GAP_PARTIAL_REMAINDER
-                                                          : 0u));
-                                            if (!policy) {
-                                                CHECK(f.instruction_address ==
-                                                      before.instruction_address);
-                                                CHECK(f.opcode == before.opcode);
-                                            }
+                                            CHECK(f.last_gap == 0);
+                                            CHECK(f.used_approximations == 0);
+                                            CHECK(f.instruction_address == 0x12345);
+                                            CHECK(f.opcode == 0x1f8);
+                                            CHECK(f.data_address == before.data_address);
                                         }
 }
 

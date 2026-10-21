@@ -5,10 +5,11 @@ hardware divider. It distinguishes documented behavior, consequences of the
 recovered control flow, and a candidate integer reconstruction. It is not a
 physical 8087 capture. The [divider-control follow-up](FPREM_DIVIDER_CONTROLS.md)
 establishes the 63-place reduction cap through an independent normalization
-path. The implementation follows that source-derived count and Intel's
-completed-history rule. Short unnormal partial history and tiny-result
-completion still retain guards; the sections below record the raw controls
-and distinguish those remaining limits.
+path. Its paired D=63 comparison also supplies a source-derived partial
+quotient-history rule. The [tiny-result follow-up](FPREM_TINY_RESULTS.md)
+establishes exact masked denormals and unmasked exponent adjustment. The
+implementation follows those derivations; the sections below record the raw
+controls and distinguish their remaining circuit and timing limits.
 
 ## Sources and scope
 
@@ -160,9 +161,9 @@ tag. A range exception invokes J16 at `#1642`.
 
 The finite safe-range path never calls J11. Its exact remainder is not
 quantized to PC24 or PC53 and has no ordinary RC rounding decision. Intel's
-no-precision-exception rule agrees with that structure. Tiny-result handling
-through J16 remains separate; this note does not resolve the control that
-prevents an inappropriate precision exception during that completion.
+no-precision-exception rule agrees with that structure. The tiny-result
+follow-up proves that the J16 shift is exact on this input grid: no nonzero
+GRS bits remain, and FPREM's documented PC independence preserves all bits.
 
 ## Quotient condition codes and history
 
@@ -186,14 +187,13 @@ Table 4a marks C0/C1/C3 undefined for an incomplete reduction. That is a limit
 of the documented interface, not proof that hardware leaves them unchanged.
 [Intel datasheet Tables 4a and 4b, printed 3-99, PDF ordinal 10, index 9](https://www.ardent-tool.com/CPU/docs/Intel/808x/8087/datasheets/205835-007.pdf#page=10).
 
-The physical connection that seeds quotient history, the initial-trial
-suppression and treatment of many leading zero quotient trials are still
-missing. This especially affects VALID unnormal dividends: stored D can be
-large while the numeric quotient is 0, 1 or 2. A software update based only
-on `bit_length(Q)` must be checked against that raw path. The existing
-completed-remainder tests do not independently prove this hidden shifter
-behavior. Also record each partial step's flags rather than assuming the
-last completed step reports the low bits of the full mathematical quotient.
+The physical history connection and individual nanosteps are not fully decoded.
+The paired D=63 and capped long-count paths nevertheless have the same
+quotient-relevant inputs and controls, supporting the same functional history
+update for short unnormal chunks. The divider-control follow-up audits the
+surviving exponent-converter and barrel-count differences rather than treating
+`bit_length(Q)` alone as evidence. Record each partial step's flags: the final
+completed step does not necessarily report the full quotient's low bits.
 
 ## Candidate integer reconstruction
 

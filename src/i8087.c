@@ -767,15 +767,22 @@ static void remainder_instruction(transaction *t) {
             (a.sign_exponent & 0x7fff) && (b.sign_exponent & 0x7fff) && (b.significand & JBIT)) {
             original_remainder_result result;
             original_remainder_status status = original_remainder(a, b, &result);
-            if (status != ORIGINAL_REMAINDER_RANGE) {
-                original = true;
-                r = result.value;
-                q = result.quotient;
-                partial = result.partial;
-                width = result.width;
-                uncertain_history = status == ORIGINAL_REMAINDER_HISTORY;
-            } else
-                gap(t, I8087_GAP_RANGE_EXCEPTION);
+            original = true;
+            r = result.value;
+            q = result.quotient;
+            partial = result.partial;
+            width = result.width;
+            if (status == ORIGINAL_REMAINDER_RANGE) {
+                /* The integer remainder lies on a representable binary80
+                   grid. J16's shift is exact and FPREM ignores PC/RC. */
+                t->raised |= I8087_UE;
+                if (t->f.control & I8087_UE)
+                    r.significand >>= (unsigned)(1 - result.exponent);
+                else {
+                    r.sign_exponent |= (uint16_t)(result.exponent + 24576);
+                    t->register_range_result = true;
+                }
+            }
         }
         if (!original) {
             r = sf_remainder(a, b, &q, &partial, &width);
@@ -783,14 +790,14 @@ static void remainder_instruction(transaction *t) {
             uncertain_history = partial;
         }
         if (uncertain_history) {
-            /* Keep the old quotient flags only as an opt-in fallback where
-               original partial history is unresolved. R and C2 still follow
-               the original stored-count reduction when available. */
+            /* Unsupported inputs retain a bounded canonical fallback and
+               old quotient flags. Strict mode stops before committing it. */
             gap(t, I8087_GAP_PARTIAL_REMAINDER);
             t->f.status |= I8087_C2;
         } else {
             /* Intel 8087 datasheet Table 4b: for quotients below 4, old
-               condition bits shift INTO the result. Modern x87 differs. */
+               condition bits shift INTO the result. The paired D=63 and
+               capped paths support the same rule for partial chunks. */
             unsigned old = ((t->f.status & I8087_C0) ? 4u : 0u) |
                            ((t->f.status & I8087_C3) ? 2u : 0u) |
                            ((t->f.status & I8087_C1) ? 1u : 0u);
@@ -806,7 +813,7 @@ static void remainder_instruction(transaction *t) {
             if (partial)
                 t->f.status |= I8087_C2;
         }
-        if (sf_denormal(r)) {
+        if (sf_denormal(r) && !original) {
             t->raised |= I8087_UE;
             gap(t, I8087_GAP_RANGE_EXCEPTION);
         }

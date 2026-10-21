@@ -27,7 +27,7 @@ exception or electrical behavior. Passing counts must not be presented as an
 | Transfers | Register/tag-preserving transfers; 32/64/80-bit real, signed integer, valid packed BCD formats | Noncanonical/invalid BCD cases and exact NaN payload rules need further source research and reference tests |
 | Finite arithmetic | Integer-software arithmetic; separate original add/subtract datapath for stored alignment, significance gates, fraction/GRS arithmetic at all distances and PC24/53/64 rounding; source-derived C1 preservation on cancellation and both-zero returns | General pseudozero inputs and unnormal range completion remain guarded; multiply/divide still use canonical fallbacks for unnormals |
 | FXTRACT | Raw-field decomposition, signed-zero pair, finite unnormal/pseudozero handling | Infinity/NaN result pairs remain guarded; finite results are document-derived, not silicon-certified |
-| FPREM | Separate original finite reduction with stored-exponent selection and a 63-place cap; normal, unnormal and pseudozero dividends; exact intermediate states, C2 and completed quotient history; PC/RC independent | Partial C0/C1/C3 remain guarded when an unnormal dividend generates fewer than three significant quotient bits; tiny-result range completion remains unresolved |
+| FPREM | Separate finite reduction with stored-exponent selection and a 63-place cap; normal, unnormal and pseudozero dividends; exact intermediate states, C2, completed history and source-derived partial history; full-width tiny results and unmasked exponent wrapping; PC/RC independent | Denormal/special input preprocessing, malformed state and divider timing remain part of the larger audits; partial history is a source-derived inference |
 | FSCALE | Zero-tag short circuits, in-range exponent-only scaling, original finite scale domain | Several exceptional/range inputs remain guarded or unverified |
 | FPTAN | Zero and positive normal operands with stored exponent <= 0x3fbf bypass the fallback | Full CORDIC/rational datapath, rounding, two raw outputs and flags remain approximate |
 | Other transcendentals | F2XM1 canonical signed-zero early return; explicit opt-in fallbacks for other inputs | General F2XM1/FYL2X/FYL2XP1/FPATAN algorithms are not original microcode; no original-result bit-equivalence claim |
@@ -57,7 +57,7 @@ validated on original hardware.
 | `I8087_GAP_UNNORMAL` | Remaining significance and tiny-conversion paths; excludes supported original finite addition, exact cancellation and bounded unnormal-plus-zero arithmetic |
 | `I8087_GAP_RANGE_EXCEPTION` | Remaining range paths, including reduced-PC masked underflow, masked CHOP overflow, and unsupported remainder/range combinations |
 | `I8087_GAP_EXCEPTION_RESTART` | Unmasked invalid comparison continuation and register range cases without a supported wrapped result |
-| `I8087_GAP_PARTIAL_REMAINDER` | Unresolved partial quotient-latch history or unsupported partial reduction |
+| `I8087_GAP_PARTIAL_REMAINDER` | Unsupported partial reduction following a canonical fallback outside the original finite path |
 | `I8087_GAP_CONSTANT_ROM` | Fixed nearest binary80 table entry rather than validated original load behavior |
 | `I8087_GAP_RESERVED_PRECISION` | PC=01 falls back to 64 bits when precision selection is relevant |
 | `I8087_GAP_UNDEFINED_OPERAND` | Unsupported/undefined original domains; many such cases stop unconditionally |
@@ -83,8 +83,8 @@ all boundary cases. Default strict mode must not be called a 1:1 mode.
 - Short/long-real denormals load as original-style unnormal temporary values.
   Their numeric interpretation is not the complete lost-significance model.
 - Completed FPREM can shift previous C3/C1 into its quotient result for small
-  quotients. Partial reduction uses the source-derived 63-place cap; short
-  unnormal quotient-history cases remain explicitly guarded.
+  quotients. Partial reduction uses the source-derived 63-place cap and the
+  same history update, supported by its paired D=63 divider path.
 - The general FPTAN fallback returns approximate sine/cosine-derived values;
   those two raw register values are not the original partial-tangent outputs.
 - Interrupt/WAIT behavior is instruction-atomic and functional. It does not

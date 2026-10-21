@@ -11,8 +11,10 @@
 - Reconstruct finite FPREM with stored-exponent selection and a 63-place cap.
   Check exact intermediate remainders, repeated reductions and completed
   quotient history independently. Preserve C2 even for a zero partial result;
-  retain guards for short unnormal partial history and tiny-result completion.
-  Pseudozero dividends follow the same stored-count selection.
+  apply the same short-quotient history update across the paired D=63 and
+  capped partial paths. Pseudozero dividends follow stored-count selection.
+  Complete exact tiny remainders with UE and no PE, full-width masked
+  denormals or the original unmasked exponent adjustment, then quotient flags.
 - Make physical hardware comparisons optional. Use original documents,
   first-hand research and independent software tests as completion evidence;
   keep related subsystem work in larger pull requests.
