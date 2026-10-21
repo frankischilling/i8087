@@ -1,9 +1,10 @@
 # Validation report
 
-Run on 2026-10-20 in a Linux x86_64 container. These are software tests, not
-original-8087 hardware measurements.
+Initial validation ran on 2026-10-20 in a Linux x86_64 container. Later Windows
+and hosted updates appear below. These are software tests, not original-8087
+hardware measurements.
 
-## Build configurations actually exercised
+## Initial build configurations
 
 | Configuration | Result |
 | --- | --- |
@@ -18,7 +19,7 @@ Compiler warnings: `-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror`.
 The initial Linux run did not test the minimum supported Python interpreter,
 Windows/MSVC or non-x86 hosts. Later hosted and Windows results are recorded below.
 
-## Actual test output
+## Initial test output
 
 ```text
 PASS: 12717 instruction/API assertions (including all 2048 ESC/ModR/M pairs)
@@ -282,3 +283,106 @@ bit operations. They check every saved register, tag, status bit and guard.
 The [reduced-precision derivation](research/UNNORMAL_REDUCED_PRECISION.md) records
 why these expectations differ from canonical arithmetic. No physical capture
 has established them as original-chip measurements.
+
+## Original finite-add datapath
+
+The separate C subsystem uses stored-exponent alignment, fraction/GRS add and
+subtract, the decoded normalization gate, half-bit promotion and raw PC
+rounding. Canonical backend operations retain their independent mathematical
+tests. Integration currently requires properly tagged nonzero finite inputs
+with stored E from `0041` through `7ffd`, or a canonical zero, and at least
+one unnormal. Exact cancellation and canonical both-zero early returns also
+accept the full finite exponent range, including normal cancellation. These
+paths preserve C1, independently of zero sign and tag. Fresh DE, reserved PC
+and unnormal range completion remain guarded. Intel's original GRS definition
+supplies the tail
+for all alignment distances, including the 64/65 boundaries and sticky-only
+counts from 66 onward.
+
+The `original_add_datapath` suite crosses 47 literal cases through 1,516,032
+register executions, with all nine operation/destination/pop forms, indices,
+TOP, both operand orders, signs, masks, sticky flags, initial C1 and policies.
+Another 6,912 executions check short/long real and integer nonzero memory
+operands. Private-path controls check half-bit promotion, range rejection and
+the cancellation payload and C1-preserve action. The matrix includes exponent
+edges, same-E cancellation and equal numeric values with different stored E.
+A further 9,216 both-zero executions cover effective signs and early returns.
+The first acceptance check fails when linked to the earlier instruction core.
+A separate normal-cancellation check reproduces C1 clearing in that core and
+passes with the source-derived preservation rule.
+
+The `original_add_fraction_oracle` suite checks 30,000 seeded inputs by choosing
+the source-prescribed alignment and rounding exact signed Python Fractions.
+It uses no C bit-operation implementation or host floating point to calculate
+the result. It also replays all 46,080 finite-add capture inputs, checking
+46,080 supported raw outcomes, including all 6,912 exact-cancellation inputs.
+These expectations exercise the reconstruction; they do not independently
+prove the physical chip follows it. CI requires both finite-add suites along
+with the remainder suites and the six existing suites.
+
+[The source investigation](research/FINITE_ADD_SUBTRACT.md) distinguishes
+resolved arithmetic branches from remaining range completion. The
+random cases include distances through 32,700. No original-hardware output has
+been supplied for this work.
+
+The FPREM regression crosses 98,304 cases with stored distances of 64, 65
+and 66 but numerically small unnormal dividends. It checks a zero partial
+result with C2 still set and the source-derived short-chunk history. Both
+policies produce the same raw state without an approximation marker. PC/RC,
+TOP, old quotient flags, both signs, old C2 and sticky flags are crossed.
+The acceptance check fails against the earlier strict partial guard.
+
+## Original remainder datapath
+
+The separate C subsystem computes `divmod(S_A * 2^k, S_B)` with
+`k = min(stored exponent distance, 63)` for a nonnegative distance. It uses a
+64-bit remainder and a separate carry for each shift, without host floating
+point or a compiler-specific wide integer. A negative distance bypasses division
+and normalizes the dividend. The result keeps the dividend sign and C2 follows
+the stored long-count branch even if the fraction becomes zero. PC and RC do
+not shorten the remainder. Exact tiny results use a full-width masked
+denormal or the original unmasked exponent adjustment.
+
+The `original_remainder_datapath` suite crosses 14 literal cases through
+917,504 executions: both signs, all PC/RC fields, TOP, old quotient history,
+old C2, sticky flags, masks and both policies. It checks every raw register,
+tags, full status/control, saved instruction and opcode, interrupt state and
+guard reporting. Another 4,096 sequences perform five successive reductions
+through completion, checking 20,480 intermediate states. The first acceptance test fails against
+the earlier instruction core, which guarded every normal partial reduction.
+
+Six paired literal cases cross completed D=63 against partial distances
+64, 65, 127 and 128, totaling 491,520 executions. Fractions, dividend exponent
+and old history stay the same while the divisor exponent changes. Cases
+cover chunks Q=0, 1, 2 and 3, zero and nonzero remainders and pseudozero inputs.
+The expected remainder and H update are the same across each pair; C2 differs.
+[The divider-control derivation](research/FPREM_DIVIDER_CONTROLS.md) audits
+the actual path dependencies. Partial C0/C1/C3 remain a source-derived
+inference for bits Intel labels undefined, rather than a measured chip result.
+
+Five tiny-result literals cross 327,680 executions with normal and unnormal
+dividends, a negative stored distance, a partial result, signs, PC/RC, TOP,
+old history, sticky flags, exception masks, global interrupt masking and both
+policies. Masked results are full-width SPECIAL-tag denormals; unmasked
+results keep the normalized fraction with the original exponent adjustment.
+Both raise UE without fresh PE, preserve other registers and complete quotient
+flags. The first check fails against the earlier tiny-result guard.
+[The exact-grid proof](research/FPREM_TINY_RESULTS.md) explains why the
+denormalizing shift cannot discard a nonzero bit.
+
+The `original_remainder_integer_oracle` suite checks 30,000 seeded ordinary
+cases, 12,000 exact tiny-result cases and 128 complete sequences, totaling
+55,316 input states in the recorded run. Python
+integer `divmod` and `bit_length` determine each result independently of the
+C serial divider. Exact Fractions separately check the final mathematical
+remainder. Every input is replayed with strict and opt-in policies; neither
+uses an approximation on this supported path. The test compares raw payloads,
+tags, every status bit, control and unchanged sentinel registers. Long
+sequences cover stored distances through 32,700 and assert at least a 63-place
+reduction for every nonzero partial result.
+
+All ten suites passed locally with GCC and MSVC on Windows and Clang with
+ASan/UBSan under Linux. The direct C demo, formatting check and diff check also
+passed. CI requires all ten suites. Hosted checks must pass on the final pull
+request head. Physical hardware is optional corroboration and is not a prerequisite
+for completing source-backed work.

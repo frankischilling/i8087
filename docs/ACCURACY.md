@@ -7,6 +7,12 @@ bit-exact or cycle-exact Intel 8087. No original 8087 was available for executio
 no physical-hardware trace corpus was used, and no target silicon revision has
 been selected. The supplied capture probe has not been run on physical hardware.
 
+Physical hardware access is outside the required scope. Completion is assessed
+from original documentation, first-hand online research and comprehensive
+independent software tests. Published captures are optional corroboration.
+The absence of private hardware alone is not a blocker; unresolved behavior,
+missing implementation and unsupported accuracy claims still matter.
+
 The tests establish agreement with sampled exact mathematical calculations,
 document-derived instruction expectations and API invariants. They do not
 establish agreement with all 8087 datapath, microcode, reserved-bit, asynchronous
@@ -18,10 +24,10 @@ exception or electrical behavior. Passing counts must not be presented as an
 | Area | Implemented and exercised | Remaining qualification |
 | --- | --- | --- |
 | State | Eight raw 80-bit physical registers, TOP, tags, control/status and pointers | Public struct is not packed; arbitrary inconsistent tags/values are not certified |
-| Transfers | Register/tag-preserving transfers; 32/64/80-bit real, signed integer, valid packed BCD formats | Noncanonical/invalid BCD cases and exact NaN payload rules need hardware evidence |
-| Finite arithmetic | Integer-software add, subtract, multiply, divide, square root, rounding; 24/53/64-bit precision and four rounding modes; bounded unnormal-plus-zero add/subtract rounds the stored alignment and retains its exponent | General original unnormal significance propagation remains guarded |
+| Transfers | Register/tag-preserving transfers; 32/64/80-bit real, signed integer, valid packed BCD formats | Noncanonical/invalid BCD cases and exact NaN payload rules need further source research and reference tests |
+| Finite arithmetic | Integer-software arithmetic; separate original add/subtract datapath for stored alignment, significance gates, fraction/GRS arithmetic at all distances and PC24/53/64 rounding; source-derived C1 preservation on cancellation and both-zero returns | General pseudozero inputs and unnormal range completion remain guarded; multiply/divide still use canonical fallbacks for unnormals |
 | FXTRACT | Raw-field decomposition, signed-zero pair, finite unnormal/pseudozero handling | Infinity/NaN result pairs remain guarded; finite results are document-derived, not silicon-certified |
-| FPREM | Complete finite remainder with original quotient-flag history; precision-control independent | Partial-reduction sequence and tiny-result range processing remain guarded |
+| FPREM | Separate finite reduction with stored-exponent selection and a 63-place cap; normal, unnormal and pseudozero dividends; exact intermediate states, C2, completed history and source-derived partial history; full-width tiny results and unmasked exponent wrapping; PC/RC independent | Denormal/special input preprocessing, malformed state and divider timing remain part of the larger audits; partial history is a source-derived inference |
 | FSCALE | Zero-tag short circuits, in-range exponent-only scaling, original finite scale domain | Several exceptional/range inputs remain guarded or unverified |
 | FPTAN | Zero and positive normal operands with stored exponent <= 0x3fbf bypass the fallback | Full CORDIC/rational datapath, rounding, two raw outputs and flags remain approximate |
 | Other transcendentals | F2XM1 canonical signed-zero early return; explicit opt-in fallbacks for other inputs | General F2XM1/FYL2X/FYL2XP1/FPATAN algorithms are not original microcode; no original-result bit-equivalence claim |
@@ -48,10 +54,10 @@ validated on original hardware.
 | Flag | Current guard/fallback |
 | --- | --- |
 | `I8087_GAP_TRANSCENDENTAL` | General software transcendental algorithms in place of original microcode; excludes canonical signed-zero F2XM1 and the tiny/zero FPTAN bypass |
-| `I8087_GAP_UNNORMAL` | General significance propagation and selected tiny unnormal conversions; excludes bounded unnormal-plus-zero arithmetic at documented PC settings |
+| `I8087_GAP_UNNORMAL` | Remaining significance and tiny-conversion paths; excludes supported original finite addition, exact cancellation and bounded unnormal-plus-zero arithmetic |
 | `I8087_GAP_RANGE_EXCEPTION` | Remaining range paths, including reduced-PC masked underflow, masked CHOP overflow, and unsupported remainder/range combinations |
 | `I8087_GAP_EXCEPTION_RESTART` | Unmasked invalid comparison continuation and register range cases without a supported wrapped result |
-| `I8087_GAP_PARTIAL_REMAINDER` | Bounded software partial reduction instead of original microcode sequence |
+| `I8087_GAP_PARTIAL_REMAINDER` | Unsupported partial reduction following a canonical fallback outside the original finite path |
 | `I8087_GAP_CONSTANT_ROM` | Fixed nearest binary80 table entry rather than validated original load behavior |
 | `I8087_GAP_RESERVED_PRECISION` | PC=01 falls back to 64 bits when precision selection is relevant |
 | `I8087_GAP_UNDEFINED_OPERAND` | Unsupported/undefined original domains; many such cases stop unconditionally |
@@ -77,7 +83,8 @@ all boundary cases. Default strict mode must not be called a 1:1 mode.
 - Short/long-real denormals load as original-style unnormal temporary values.
   Their numeric interpretation is not the complete lost-significance model.
 - Completed FPREM can shift previous C3/C1 into its quotient result for small
-  quotients. Partial reduction is still explicitly unverified.
+  quotients. Partial reduction uses the source-derived 63-place cap and the
+  same history update, supported by its paired D=63 divider path.
 - The general FPTAN fallback returns approximate sine/cosine-derived values;
   those two raw register values are not the original partial-tangent outputs.
 - Interrupt/WAIT behavior is instruction-atomic and functional. It does not
@@ -85,21 +92,35 @@ all boundary cases. Default strict mode must not be called a 1:1 mode.
 - Masked directed overflow follows Intel S-75: raise PE without newly setting
   OE, preserving an old sticky OE. A normal finite register saturation bound
   has all 64 significand bits set after PC rounding. Memory bounds retain their
-  format widths. These are source-derived policies awaiting original captures;
-  [the investigation](research/DIRECTED_OVERFLOW.md) records the printed
-  discrepancy and decoded-path evidence.
+  format widths. Physical comparisons are optional for these source-derived
+  policies. [The investigation](research/DIRECTED_OVERFLOW.md) records the
+  printed discrepancy and decoded-path evidence.
 
-## Evidence required for a 1:1 claim
+## Completion evidence and accuracy claims
 
-Select a target original part/revision. Validate documented instructions and
-relevant aliases against preserved raw-state captures across register classes,
-all control modes, exception priorities, stack faults, memory formats, constant
-loads and transcendental boundaries. Replace or validate guarded fallback paths.
-Where documentation and die interpretation disagree, preserve the disagreement
-until a targeted capture or circuit-level derivation resolves it.
+The target is the original Intel 8087 on an 8088/8087 PC-style system, with
+stepping unconfirmed. Validate documented instructions and relevant aliases
+using original sources and independent raw-state software expectations across
+register classes, control modes, exception priorities, stack faults, memory
+formats, constant loads and transcendental boundaries. Replace guarded
+fallbacks with source-backed implementations and test complete instruction
+sequences, including intermediate state and exception continuation.
 
-The collector in this release is only a starting point: masked, register-form,
-single-instruction captures. It does not cover unmasked exception handlers,
-memory transfers, instruction sequences or timing. Those require additional
-capture fixtures and tests. Cycle- or pin-exact claims also require a separate
-validated execution/bus model. See HARDWARE_VALIDATION.md.
+Where original documentation and die interpretation disagree, record the
+conflict and the evidence supporting the implemented behavior. Resolve it
+through further primary-source research, attributable circuit or microcode
+analysis, or suitable published comparisons. Physical access, private captures
+and a complete transistor reconstruction are not completion requirements.
+Unresolved behavior and missing implementations remain open accuracy gaps.
+
+Cycle accuracy requires a separate execution/bus model with independently
+derived software waveform and event-order tests for the stated host system.
+Document bus, clock and contention assumptions. Claim only the behavior and
+timing supported by the evidence; passing software tests does not establish
+measured agreement with every manufactured part or its electrical behavior.
+
+The optional collector covers masked, register-form, single-instruction
+captures. It does not cover unmasked exception handlers, memory transfers,
+instruction sequences or timing. Retain it for attributable public comparisons
+without making its execution a prerequisite. See
+[HARDWARE_VALIDATION.md](HARDWARE_VALIDATION.md).

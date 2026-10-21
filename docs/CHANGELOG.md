@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Reconstruct finite addition/subtraction in a separate original-datapath
+  subsystem. Preserve stored alignment and the decoded normalization gate,
+  handle fraction/GRS differences and rounding carry, and retain guards for
+  unnormal range completion. Apply Intel's original GRS definition to large
+  alignment counts. Preserve C1 on exact cancellation and both-zero returns
+  through an explicit action separate from J11's rounding decision.
+- Reconstruct finite FPREM with stored-exponent selection and a 63-place cap.
+  Check exact intermediate remainders, repeated reductions and completed
+  quotient history independently. Preserve C2 even for a zero partial result;
+  apply the same short-quotient history update across the paired D=63 and
+  capped partial paths. Pseudozero dividends follow stored-count selection.
+  Complete exact tiny remainders with UE and no PE, full-width masked
+  denormals or the original unmasked exponent adjustment, then quotient flags.
+- Make physical hardware comparisons optional. Use original documents,
+  first-hand research and independent software tests as completion evidence;
+  keep related subsystem work in larger pull requests.
+
 - Use the requested C formatting with K&R braces and blank lines between
   function and other definition blocks.
 - Preserve bounded PC64 unnormal-plus-zero add/subtract results without

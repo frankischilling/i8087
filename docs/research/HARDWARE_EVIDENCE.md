@@ -12,6 +12,12 @@ execution-state or bus-capture dataset was located in the sources inspected
 below. The repository's collector has not produced original-hardware evidence;
 its limits remain documented in [HARDWARE_VALIDATION.md](../HARDWARE_VALIDATION.md).
 
+The project owner has confirmed that physical 8087 access is unavailable.
+Original documents, online research and independent software tests are the
+required validation basis. Specimen acquisition, a private capture run and
+stepping certification are not completion gates. The physical-acquisition
+issue is closed as not planned; the missing implementation areas remain open.
+
 The research supports implementation work against Intel's specification and
 physical-die research. It does not establish byte accuracy or cycle accuracy
 for a particular manufactured part.
@@ -43,7 +49,7 @@ FSCALE investigation](https://www.righto.com/2026/09/8087-microcode-reverse-engi
 Recommendation: use an explicit provisional target description such as
 "Intel 8087, stepping unconfirmed, original instruction set, IBM 5150-style
 8088 host." Do not invent an A/B/C revision or assume every speed grade has
-identical undocumented behavior. Once a physical specimen becomes available,
+identical undocumented behavior. If a physical specimen becomes available,
 assign it a specimen identifier and preserve photographs of every package
 marking, its board, and the source of the part. Retain an unknown stepping
 field until a primary identification source or direct die comparison resolves
@@ -63,15 +69,18 @@ through RQ/GT, READY-based transfer completion, and BUSY connected to TEST for
 WAIT synchronization. Its pin and system descriptions are the basis for the
 host-interface model. See printed 3-91 through 3-93. [Intel datasheet](https://datasheets.chipdb.org/Intel/x86/808x/datashts/8087/205835-007.pdf#page=2).
 
-The recommended first fixture therefore uses an original Intel 8088, a physical
-Intel 8087 rated for the actual clock, the shared board clock, and documented
-PC-style bus wiring. Fix and record the motherboard revision before treating
-timing results as a baseline. Record refresh/DMA activity, memory location,
-READY behavior, interrupt routing, and the exact instruction stream with every
-trace. Zero-wait-state isolated timing is a separate experiment, not an assumed
-description of a complete PC. Pin propagation delays and clock-edge behavior
-also need a stated measurement tolerance; an instruction-cycle count alone
-does not validate them.
+The initial software timing fixture should model the Intel 8088 and 8087 on
+the shared board clock with documented PC-style bus wiring. State the modeled
+motherboard configuration, refresh/DMA activity, memory location, READY
+behavior, interrupt routing and exact instruction stream with every waveform.
+An isolated zero-wait-state fixture is a separate case, not an assumed
+description of a complete PC.
+
+If physical timing results are published or contributed, record the processor
+markings, actual clock and motherboard revision before using them as a
+comparison baseline. Pin propagation delays and clock-edge measurements need
+a stated tolerance; an instruction-cycle count alone does not validate them.
+Obtaining these measurements is optional.
 
 ## Sources inspected for reusable hardware captures
 
@@ -121,29 +130,25 @@ requests failed; the Intel datasheet was visually checked using the independent
 scan linked above. Search indexing and these access failures limit the negative
 finding. Private collections and unindexed attachments remain possible.
 
-## Concrete next actions
+## Validation without physical access
 
-1. Keep silicon identification and original-hardware validation open as separate
-   requirements. Link every future dataset to a physical specimen and board.
-2. Seek an Intel product-change/qualification notice or errata document mapping
-   actual 8087 markings to die revisions. Compare the markings of the
-   reverse-engineered specimen with any prospective capture specimen before
-   combining their evidence.
-3. Arrange a run of the existing register-state collector on a documented
-   original machine. Preserve the collector, input and output hashes, original
-   binaries, case manifest, board/part photographs and the operator's account
-   together. No request to another person was sent during this research.
-4. Repeat the same input set on independently sourced 8087 specimens. Investigate
-   differences as possible specimen, setup, collector or revision effects before
-   changing the emulator.
-5. Build a separate timing fixture that records the clock, BUSY, queue status,
-   READY, address/data bus, bus status and RQ/GT around known instruction
-   sequences. Add reset and unmasked-exception/interrupt captures in dedicated
-   runs. The present FSAVE collector does not observe those signals.
-6. Preserve raw captures and publish reproducible conversion/comparison steps.
-   Derived expectations should identify their exact source record, defined-bit
-   masks and unresolved fields. Successful model self-comparisons, diagnostic
-   runs and modern x87 comparisons cannot be counted as original-8087 evidence.
+1. Use an explicit original-8087 specification baseline and retain the unknown
+   stepping. Inspect relevant Intel change notices or errata when found, without
+   inventing a mapping from package/date codes to behavioral revisions.
+2. Derive raw results, flags and timing transitions from original documents and
+   attributable circuit/microcode research. Preserve disagreements and identify
+   the consequences of any interpretation still in use.
+3. Build deterministic software fixtures and independent references for numeric
+   results, intermediate states, exceptions and clocked bus/queue behavior.
+   Test boundaries and source-discriminating cases, rather than only final
+   mathematical values or comparisons of the model with itself.
+4. Preserve useful online captures with their provenance, hashes and conversion
+   steps. Distinguish CPU-only traces from 8087 results and identify differences
+   between chips and systems before combining evidence. Captures remain optional.
+5. Retain the DOS collector as an optional tool for future attributable public
+   results. It is not required for project completion and has not been validated
+   on physical hardware here. Do not count model output or a diagnostic pass as
+   a physical 8087 measurement.
 
 No files from the external microcode tools, manual scans or third-party test
 suites were copied into the implementation as part of this research.

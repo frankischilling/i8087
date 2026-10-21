@@ -162,8 +162,9 @@ static void remainder_flags(void) {
         i8087_init(&f);
         number(&f, 0, (i8087_f80){JBIT, 0x4100});
         number(&f, 1, integer(3));
-        CHECK(op(&f, 0xd9, 0xf8) == I8087_UNVERIFIED);
-        CHECK(f.last_gap & I8087_GAP_PARTIAL_REMAINDER);
+        ok(&f, 0xd9, 0xf8);
+        CHECK(eq(st(&f, 0), (i8087_f80){JBIT, 0x40c0}));
+        CHECK((f.status & CC) == (I8087_C2 | cc_from_q(5)));
     }
     {
         i8087 f;
@@ -1228,6 +1229,56 @@ static void unnormal_zero_reduced_precision(void) {
                             }
 }
 
+static void remainder_stored_exponent_selection(void) {
+    unsigned distance, sign, divisor_sign, pc, rc, top, history, old_c2, sticky, policy;
+    for (distance = 64; distance <= 66; ++distance)
+        for (sign = 0; sign < 2; ++sign)
+            for (divisor_sign = 0; divisor_sign < 2; ++divisor_sign)
+                for (pc = 0; pc < 4; ++pc)
+                    for (rc = 0; rc < 4; ++rc)
+                        for (top = 0; top < 8; ++top)
+                            for (history = 0; history < 8; ++history)
+                                for (old_c2 = 0; old_c2 < 2; ++old_c2)
+                                    for (sticky = 0; sticky < 2; ++sticky)
+                                        for (policy = 0; policy < 2; ++policy) {
+                                            i8087 f, before, expected;
+                                            unsigned i;
+                                            i8087_init(&f);
+                                            f.control = (uint16_t)(0xbf | (pc << 8) | (rc << 10));
+                                            f.status = (uint16_t)((top << 11) | cc_from_q(history) |
+                                                                  (old_c2 ? I8087_C2 : 0) |
+                                                                  (sticky ? 0x3f : 0));
+                                            f.policy = policy ? I8087_ALLOW_APPROXIMATION
+                                                              : I8087_STOP_ON_UNVERIFIED;
+                                            for (i = 0; i < 8; ++i)
+                                                number(&f, i, integer((int)i + 11));
+                                            slot(&f, 0,
+                                                 (i8087_f80){1, (uint16_t)((0x3fff + distance) |
+                                                                           (sign << 15))},
+                                                 I8087_TAG_VALID);
+                                            slot(&f, 1,
+                                                 (i8087_f80){JBIT, (uint16_t)(0x3fff | (divisor_sign
+                                                                                        << 15))},
+                                                 I8087_TAG_VALID);
+                                            before = expected = f;
+                                            slot(&expected, 0,
+                                                 (i8087_f80){0, (uint16_t)(sign << 15)},
+                                                 I8087_TAG_ZERO);
+                                            expected.status =
+                                                (uint16_t)((expected.status & ~CC) | I8087_C2 |
+                                                           cc_from_q(((history << 1) | 1) & 7));
+                                            CHECK(op(&f, 0xd9, 0xf8) == I8087_OK);
+                                            CHECK(same_registers(&f, &expected));
+                                            CHECK(f.status == expected.status);
+                                            CHECK(f.control == expected.control);
+                                            CHECK(f.last_gap == 0);
+                                            CHECK(f.used_approximations == 0);
+                                            CHECK(f.instruction_address == 0x12345);
+                                            CHECK(f.opcode == 0x1f8);
+                                            CHECK(f.data_address == before.data_address);
+                                        }
+}
+
 int main(void) {
     extract_fields();
     remainder_flags();
@@ -1242,6 +1293,7 @@ int main(void) {
     alternate_register_encodings();
     unnormal_zero_arithmetic();
     unnormal_zero_reduced_precision();
+    remainder_stored_exponent_selection();
     printf(
         "PASS: %lu original-8087 regression assertions (document-derived, not hardware captures)\n",
         checks);

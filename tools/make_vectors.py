@@ -142,12 +142,38 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
                                     add(f"{name} unnormal+zero raw={x} side={which} zeroSign={zero_sign} pc={pc} rc={rc} top={top}",
                                         0xD8, opcode, a, b, cw=0xBF | pc << 8 | rc << 10,
                                         sw=top << 11 | 0x4700)
+    if suite in ("finite-add", "all"):
+        operands = (
+            ((0x4000, J >> 2), (0x4000, J >> 2)),
+            ((0x4000, J >> 1), (0x4000, J >> 1)),
+            ((0x4000, J + (J >> 1)), (0x4000, (J >> 1) + (J >> 2))),
+            ((0x4000, (J >> 1) + (J >> 2)), (0x4000, J >> 2)),
+            ((0x4001, (J >> 1) + (J >> 2)), (0x3FFF, J)),
+            ((0x403E, 1), (0x3FFF, J + 1)),
+            ((0x403F, 1), (0x3FFF, J)),
+            ((0x4040, 1), (0x3FFF, J)),
+            ((0x4041, 1), (0x3FFF, J)),
+            ((0x4000, J - 1), (0x4000, J - 1)))
+        for item, (left, right) in enumerate(operands):
+            for which in range(2):
+                for signs in range(4):
+                    a = (left[0] | (signs & 1) << 15, left[1])
+                    b = (right[0] | (signs >> 1) << 15, right[1])
+                    a, b = (b, a) if which else (a, b)
+                    for pc in (0, 2, 3):
+                        for rc in range(4):
+                            for top in range(8):
+                                for c1 in range(2):
+                                    for name, opcode in (("FADD", 0xC1), ("FSUB", 0xE1), ("FSUBR", 0xE9)):
+                                        add(f"{name} finite raw pair={item} side={which} signs={signs} pc={pc} rc={rc} top={top} C1={c1}",
+                                            0xD8, opcode, a, b, cw=0xBF | pc << 8 | rc << 10,
+                                            sw=top << 11 | 0x4500 | c1 << 9)
     return records, names
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "constants", "encodings", "unnormal-zero", "all"), default="smoke")
+    parser.add_argument("--suite", choices=("smoke", "research", "frndint", "overflow", "constants", "encodings", "unnormal-zero", "finite-add", "all"), default="smoke")
     args = parser.parse_args()
     try:
         args.output.mkdir(parents=True, exist_ok=False)

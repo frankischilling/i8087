@@ -11,10 +11,17 @@ capture receipts for future bus tests.
 These issues track the known gaps. Their acceptance criteria require more
 than passing the current mathematical and regression tests.
 
+Physical 8087 access is unavailable and is not a completion requirement.
+Validation uses original Intel documentation, attributable die/microcode
+research, independent software references and deterministic automated tests.
+Useful published captures can corroborate those results. The physical
+acquisition requirement in [#3](https://github.com/frankischilling/i8087/issues/3)
+is closed as not planned; no hardware comparison or stepping certification
+is claimed.
+
 | Work | Issue | Completion evidence |
 | --- | --- | --- |
-| Identify a specimen/revision and validate captures | [#3](https://github.com/frankischilling/i8087/issues/3) | Attributable raw states, collector validation and reproducible comparisons |
-| Model execution and the 8088 bus by cycle | [#4](https://github.com/frankischilling/i8087/issues/4) | Original clock, bus and pin traces, including overlap and exceptions |
+| Model execution and the 8088 bus by cycle | [#4](https://github.com/frankischilling/i8087/issues/4) | Source-derived transitions and independent clock/bus waveform fixtures, including overlap and exceptions |
 | Reproduce transcendental datapaths | [#5](https://github.com/frankischilling/i8087/issues/5) | Original algorithms, internal rounding and raw result comparisons |
 | Preserve unnormal significance and partial FPREM steps | [#6](https://github.com/frankischilling/i8087/issues/6) | Intermediate state and condition-code comparisons |
 | Resolve range and precision behavior | [#7](https://github.com/frankischilling/i8087/issues/7) | Discriminating tests for conflicting sources and range boundaries |
@@ -22,11 +29,12 @@ than passing the current mathematical and regression tests.
 | Recover constant loading | [#9](https://github.com/frankischilling/i8087/issues/9) | ROM/loading derivation and results across control modes |
 | Audit decoding, transfers and reserved state | [#10](https://github.com/frankischilling/i8087/issues/10) | Independent opcode matrix and memory/noncanonical-state captures |
 
-Start with reproducible failures supported by original documentation, while
-developing the capture and timing fixtures. Keep each correction small enough
-to review and test. Add a focused issue when a concrete bug is found within a
-broader area; closing that bug does not close the area's hardware-validation
-requirement.
+Work from original documentation and reproducible failures while developing
+the capture and timing fixtures. Group related implementation, research and
+validation work in one pull request for the existing subsystem issues. Create
+new issues for distinct missing work when needed. Do not split each correction
+into a smaller issue or treat a partial fix as completion of the larger
+implementation and validation requirements.
 
 Every accuracy change needs a stated source, the behavior it predicts, and
 tests that distinguish the correction from the existing behavior. Record

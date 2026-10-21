@@ -1,4 +1,9 @@
-# Original-hardware capture and model replay
+# Software replay and optional hardware capture
+
+Required validation uses source-backed software tests and independent
+references, as described in [TESTING.md](TESTING.md). Physical 8087 access is
+not required. This document also preserves the optional capture workflow for
+future public results; it does not require obtaining or operating a specimen.
 
 ## What this workflow does
 
@@ -49,7 +54,8 @@ Select a campaign with `--suite`:
 | `constants` | 2,688 | All seven loads, documented PC fields, RC, TOP, empty/full stacks and clear/set sticky PE |
 | `encodings` | 72 | The nine alternate register groups in Intel Table A-2 |
 | `unnormal-zero` | 15,360 | Bounded PC24/53/64 add/subtract, ties, carry, pseudozero output, signs, operand order, RC and TOP |
-| `all` | 19,060 | Combined campaigns |
+| `finite-add` | 46,080 | Two nonzero operands, significance, carry, alignment edges and cancellation, including unresolved cases |
+| `all` | 65,140 | Combined campaigns |
 
 The constant campaign preserves known raw bytes in every register and records
 which inputs have occupied stacks. Its model-only check has 384 supported
@@ -61,12 +67,19 @@ Input generation alone establishes nothing about the chip or the emulator's
 accuracy. The FRNDINT campaign includes every raw PC field value; reserved
 field probes do not establish documented behavior for that setting.
 
+The finite-add campaign includes stored exponent differences of 63, 64, 65 and
+66 and seeds both C1 states. All 46,080 inputs now have source-derived model
+expectations, including C1 preservation on cancellation. Preserve physical
+results for any inputs if obtained; a model match is not a physical comparison.
+The combined campaign remains
+within the DOS collector's 65,535-record limit.
+
 `tools/hardware/CAPTURE.COM` is supplied together with its assembly source. The
 build script can reproduce it using GNU `as` and `ld` with 32-bit ELF support;
 `.code16` and `.arch i8086` select the real-mode instruction encoding. No DOS C
 runtime, host floating point or external library is used by the probe.
 
-## Collect on the physical target
+## Optional collection on a physical target
 
 Copy CAPTURE.COM and the selected VECTORS.BIN into an otherwise disposable
 working directory on the original machine. DOS must support the collector's
@@ -191,9 +204,11 @@ unmasked tests.
 The test slot is rewritten and followed by a taken jump to flush the 8086/8088
 prefetch queue before execution.
 
-This release does not collect unmasked exception-handler entry/continuation,
+The collector does not collect unmasked exception-handler entry/continuation,
 external memory transfers, multi-instruction sequence histories, clock counts,
-pins, queues or bus arbitration. Those need separate fixtures and validation.
+pins, queues or bus arbitration. Required coverage for those areas belongs in
+source-backed software fixtures and independent reference tests. Additional
+physical collectors would be optional corroboration.
 It also does not automatically bind a capture to a chip photograph or authenticate
 its provenance. Keep the source inputs, program hash, raw capture and machine
 metadata together instead of promoting unlabeled numbers to hardware truth.

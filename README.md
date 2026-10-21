@@ -5,10 +5,10 @@ An instruction-level 8087 implementation with an integer-only
 arithmetic, `long double`, `libm`, inline assembly, or compiler-specific 128-bit
 integers.
 
-**This is not yet a complete, bit-exact or cycle-exact replica.** This revision
-fixes original-8087 instruction and exception behavior and adds independent
-boundary tests and hardware-capture tools. No original-hardware captures have
-been used to validate it. See [accuracy](docs/ACCURACY.md) and
+**This is not yet a complete, bit-exact or cycle-exact replica.** Validation
+uses original Intel documentation, die research and independent software tests.
+Physical hardware access is not required; no original-chip measurements are
+claimed. See [accuracy](docs/ACCURACY.md) and
 [changes](docs/CHANGELOG.md).
 
 Known guarded cases return `I8087_UNVERIFIED` without committing architectural
@@ -24,7 +24,7 @@ ctest --test-dir build --output-on-failure
 ./build/i8087_demo
 ```
 
-The library needs a C11 compiler and the standard C library. Three additional
+The library needs a C11 compiler and the standard C library. Four additional
 test suites use Python and its standard library; CMake skips those suites
 when Python is unavailable. No third-party numerical library is required.
 
@@ -38,8 +38,8 @@ Control=03bf Status=0000 Tags=ffff
 A direct build is also possible:
 
 ```sh
-cc -std=c11 -O2 -Iinclude -Isrc src/i8087.c src/soft80.c src/transcend.c \
-  examples/demo.c -o i8087_demo
+cc -std=c11 -O2 -Iinclude -Isrc src/i8087.c src/soft80.c src/original_add.c \
+  src/original_remainder.c src/transcend.c examples/demo.c -o i8087_demo
 ```
 
 On multi-configuration CMake generators, add `--config Release` to the build,
@@ -53,6 +53,8 @@ and MSVC on Windows. MinGW GCC also passes the suites locally.
 | `include/i8087.h` | Public per-instance API and raw 80-bit value type |
 | `src/i8087.c` | Instruction decoding, state, transfers, exception handling |
 | `src/soft80.c` | Integer-software arithmetic and format conversion |
+| `src/original_add.c` | Original finite-add fraction/GRS datapath and significance |
+| `src/original_remainder.c` | Stored-exponent remainder reduction and quotient history |
 | `src/transcend.c` | Guarded, non-bit-exact transcendental fallbacks |
 | `tests/` | Instruction regressions, rational oracles, raw-state safety tests |
 | `tools/` | Input-vector generation, C replay, trace comparison |
@@ -66,7 +68,7 @@ instruction execution, WAIT synchronization, and any bus/cycle timing model.
 The core does not model an entire computer.
 
 Read [the API contract](docs/API.md), [test results](docs/TESTING.md), and
-[hardware-validation workflow](docs/HARDWARE_VALIDATION.md) before integration.
+[software replay and optional capture workflow](docs/HARDWARE_VALIDATION.md) before integration.
 See [development](docs/DEVELOPMENT.md) for CI and pull request requirements.
 The [roadmap](docs/ROADMAP.md) links the open accuracy issues and
 [hardware evidence](docs/research/HARDWARE_EVIDENCE.md) records the initial

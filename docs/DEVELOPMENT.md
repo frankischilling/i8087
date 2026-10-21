@@ -1,12 +1,15 @@
 # Development and review
 
-Use a feature branch and a pull request for changes. Link each accuracy fix to
-an issue with a specific requirement, primary-source references, a reproducer,
-and acceptance criteria. Close an issue only when all its criteria are met.
-Keep broader hardware-validation issues open when a document-derived correction
-addresses only part of them.
+Use a feature branch and a pull request for changes. Group related accuracy
+work in a larger pull request linked to the existing subsystem issues, with
+primary-source references, reproducers and acceptance criteria. Create a new
+issue for distinct missing work rather than every smaller correction. Close
+an issue only when its full implementation and software-validation criteria
+are met. Physical hardware access is not required; use original documentation,
+first-hand research and independent software references. Published captures
+are optional corroboration.
 
-CI runs the six existing suites with GCC on Linux, Clang with AddressSanitizer
+CI runs all ten suites with GCC on Linux, Clang with AddressSanitizer
 and UndefinedBehaviorSanitizer on Linux, and MSVC on Windows. Compiler warnings
 are errors. The GCC job checks the supported Python minimum; the other jobs use
 a current interpreter. CI verifies test discovery so a missing interpreter
