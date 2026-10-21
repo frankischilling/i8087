@@ -23,6 +23,12 @@ leads. A source edition or speed grade does not identify a silicon stepping.
 The [constant-load investigation](research/CONSTANT_LOADS.md) separates the
 decoded fixed-transfer path from the still-unconfirmed payload bits.
 
+The [bus-timing investigation](research/8088_BUS_TIMING.md) records original
+pin setup/hold, queue reports, reset and operand-read evidence. A pinned AMD
+8088 ESC corpus supplies host trace examples with explicit provenance; it is
+not a physical Intel 8087 execution reference. Internal queue ordering,
+opcode-latch delays and complete coprocessor timing remain unresolved.
+
 ## Intel 8087 datasheet, order 205835-007
 
 Intel, *8087 Numeric Data Processor*, archived PDF:

@@ -4,6 +4,9 @@ The target is an original Intel 8087 on an 8088/8087 PC-style system. The
 provisional system baseline is an IBM 5150 configuration. A silicon stepping
 has not been established. [Hardware evidence](research/HARDWARE_EVIDENCE.md)
 records the sources searched and the limits of the available evidence.
+[Bus timing](research/8088_BUS_TIMING.md) separates documented pin sampling
+from unresolved internal queue and execution timing, with inspected host
+capture receipts for future bus tests.
 
 These issues track the known gaps. Their acceptance criteria require more
 than passing the current mathematical and regression tests.

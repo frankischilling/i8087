@@ -90,6 +90,14 @@ mark unknown register functions, operation meanings and entry points. A decoder
 that prints recovered microcode is not proof that every control signal has
 been interpreted correctly.
 
+A follow-up [bus investigation](8088_BUS_TIMING.md) downloaded and inspected
+the complete pinned D8 ESC host dataset: 10,000 records from an AMD D8088.
+It records the file hash, original provenance, queue-window limits, two-byte
+memory reads and prefix reports. These are concrete host bus captures, with
+no 8087 registers, BUSY/INT signals or coprocessor arbitration. They do not
+change the missing-original-8087 finding above. The external dataset remains
+outside the tracked repository.
+
 The search also inspected Shirriff's [2018 die report](https://www.righto.com/2018/08/inside-die-of-intels-8087-coprocessor.html)
 and [2026 instruction-decoding report](https://www.righto.com/2026/02/8087-instruction-decoding.html).
 These provide first-hand physical analysis. Neither inspected report supplies a
