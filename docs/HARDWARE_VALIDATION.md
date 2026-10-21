@@ -79,7 +79,7 @@ build script can reproduce it using GNU `as` and `ld` with 32-bit ELF support;
 `.code16` and `.arch i8086` select the real-mode instruction encoding. No DOS C
 runtime, host floating point or external library is used by the probe.
 
-## Collect on the physical target
+## Optional collection on a physical target
 
 Copy CAPTURE.COM and the selected VECTORS.BIN into an otherwise disposable
 working directory on the original machine. DOS must support the collector's
@@ -204,9 +204,11 @@ unmasked tests.
 The test slot is rewritten and followed by a taken jump to flush the 8086/8088
 prefetch queue before execution.
 
-This release does not collect unmasked exception-handler entry/continuation,
+The collector does not collect unmasked exception-handler entry/continuation,
 external memory transfers, multi-instruction sequence histories, clock counts,
-pins, queues or bus arbitration. Those need separate fixtures and validation.
+pins, queues or bus arbitration. Required coverage for those areas belongs in
+source-backed software fixtures and independent reference tests. Additional
+physical collectors would be optional corroboration.
 It also does not automatically bind a capture to a chip photograph or authenticate
 its provenance. Keep the source inputs, program hash, raw capture and machine
 metadata together instead of promoting unlabeled numbers to hardware truth.

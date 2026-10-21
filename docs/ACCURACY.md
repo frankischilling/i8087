@@ -92,21 +92,35 @@ all boundary cases. Default strict mode must not be called a 1:1 mode.
 - Masked directed overflow follows Intel S-75: raise PE without newly setting
   OE, preserving an old sticky OE. A normal finite register saturation bound
   has all 64 significand bits set after PC rounding. Memory bounds retain their
-  format widths. These are source-derived policies awaiting original captures;
-  [the investigation](research/DIRECTED_OVERFLOW.md) records the printed
-  discrepancy and decoded-path evidence.
+  format widths. Physical comparisons are optional for these source-derived
+  policies. [The investigation](research/DIRECTED_OVERFLOW.md) records the
+  printed discrepancy and decoded-path evidence.
 
-## Evidence required for a 1:1 claim
+## Completion evidence and accuracy claims
 
-Select a target original part/revision. Validate documented instructions and
-relevant aliases against preserved raw-state captures across register classes,
-all control modes, exception priorities, stack faults, memory formats, constant
-loads and transcendental boundaries. Replace or validate guarded fallback paths.
-Where documentation and die interpretation disagree, preserve the disagreement
-until a targeted capture or circuit-level derivation resolves it.
+The target is the original Intel 8087 on an 8088/8087 PC-style system, with
+stepping unconfirmed. Validate documented instructions and relevant aliases
+using original sources and independent raw-state software expectations across
+register classes, control modes, exception priorities, stack faults, memory
+formats, constant loads and transcendental boundaries. Replace guarded
+fallbacks with source-backed implementations and test complete instruction
+sequences, including intermediate state and exception continuation.
 
-The collector in this release is only a starting point: masked, register-form,
-single-instruction captures. It does not cover unmasked exception handlers,
-memory transfers, instruction sequences or timing. Those require additional
-capture fixtures and tests. Cycle- or pin-exact claims also require a separate
-validated execution/bus model. See HARDWARE_VALIDATION.md.
+Where original documentation and die interpretation disagree, record the
+conflict and the evidence supporting the implemented behavior. Resolve it
+through further primary-source research, attributable circuit or microcode
+analysis, or suitable published comparisons. Physical access, private captures
+and a complete transistor reconstruction are not completion requirements.
+Unresolved behavior and missing implementations remain open accuracy gaps.
+
+Cycle accuracy requires a separate execution/bus model with independently
+derived software waveform and event-order tests for the stated host system.
+Document bus, clock and contention assumptions. Claim only the behavior and
+timing supported by the evidence; passing software tests does not establish
+measured agreement with every manufactured part or its electrical behavior.
+
+The optional collector covers masked, register-form, single-instruction
+captures. It does not cover unmasked exception handlers, memory transfers,
+instruction sequences or timing. Retain it for attributable public comparisons
+without making its execution a prerequisite. See
+[HARDWARE_VALIDATION.md](HARDWARE_VALIDATION.md).

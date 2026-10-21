@@ -49,7 +49,7 @@ FSCALE investigation](https://www.righto.com/2026/09/8087-microcode-reverse-engi
 Recommendation: use an explicit provisional target description such as
 "Intel 8087, stepping unconfirmed, original instruction set, IBM 5150-style
 8088 host." Do not invent an A/B/C revision or assume every speed grade has
-identical undocumented behavior. Once a physical specimen becomes available,
+identical undocumented behavior. If a physical specimen becomes available,
 assign it a specimen identifier and preserve photographs of every package
 marking, its board, and the source of the part. Retain an unknown stepping
 field until a primary identification source or direct die comparison resolves
@@ -69,15 +69,18 @@ through RQ/GT, READY-based transfer completion, and BUSY connected to TEST for
 WAIT synchronization. Its pin and system descriptions are the basis for the
 host-interface model. See printed 3-91 through 3-93. [Intel datasheet](https://datasheets.chipdb.org/Intel/x86/808x/datashts/8087/205835-007.pdf#page=2).
 
-The recommended first fixture therefore uses an original Intel 8088, a physical
-Intel 8087 rated for the actual clock, the shared board clock, and documented
-PC-style bus wiring. Fix and record the motherboard revision before treating
-timing results as a baseline. Record refresh/DMA activity, memory location,
-READY behavior, interrupt routing, and the exact instruction stream with every
-trace. Zero-wait-state isolated timing is a separate experiment, not an assumed
-description of a complete PC. Pin propagation delays and clock-edge behavior
-also need a stated measurement tolerance; an instruction-cycle count alone
-does not validate them.
+The initial software timing fixture should model the Intel 8088 and 8087 on
+the shared board clock with documented PC-style bus wiring. State the modeled
+motherboard configuration, refresh/DMA activity, memory location, READY
+behavior, interrupt routing and exact instruction stream with every waveform.
+An isolated zero-wait-state fixture is a separate case, not an assumed
+description of a complete PC.
+
+If physical timing results are published or contributed, record the processor
+markings, actual clock and motherboard revision before using them as a
+comparison baseline. Pin propagation delays and clock-edge measurements need
+a stated tolerance; an instruction-cycle count alone does not validate them.
+Obtaining these measurements is optional.
 
 ## Sources inspected for reusable hardware captures
 
