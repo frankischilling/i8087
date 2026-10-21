@@ -1136,8 +1136,9 @@ static void unnormal_zero_reduced_precision(void) {
                                                     (uint16_t)(0x1000 |
                                                                (reduced_zero_cases[item].pc << 8) |
                                                                (rc << 10) | (masks ? 0x3f : 0));
-                                                f.status = (uint16_t)((top << 11) | CC |
-                                                                      (sticky ? 0x3f : 0));
+                                                f.status =
+                                                    (uint16_t)((top << 11) | (CC & ~I8087_C1) |
+                                                               (sticky ? I8087_C1 | 0x3f : 0));
                                                 i8087_set_policy(&f,
                                                                  policy ? I8087_ALLOW_APPROXIMATION
                                                                         : I8087_STOP_ON_UNVERIFIED);
