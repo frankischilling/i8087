@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Reconstruct finite addition/subtraction in a separate original-datapath
+  subsystem. Preserve stored alignment and the decoded normalization gate,
+  handle fraction/GRS differences and rounding carry, and retain guards for
+  unresolved large shifts, exact-cancellation C1 and range completion.
+- Select FPREM's long-path guard and C2 from stored exponents before an
+  unnormal dividend is normalized. Keep partial-divider count and quotient
+  history unresolved rather than accepting a canonical zero as a completed
+  original step.
+- Make physical hardware comparisons optional. Use original documents,
+  first-hand research and independent software tests as completion evidence;
+  keep related subsystem work in larger pull requests.
+
 - Use the requested C formatting with K&R braces and blank lines between
   function and other definition blocks.
 - Preserve bounded PC64 unnormal-plus-zero add/subtract results without

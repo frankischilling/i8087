@@ -94,6 +94,20 @@ connects precision reporting to the discarded bits. These sources support the
 bounded PC24/53 path, including pseudozero output; they do not establish
 general unnormal arithmetic or agreement with a physical chip.
 
+The [finite addition/subtraction reconstruction](research/FINITE_ADD_SUBTRACT.md)
+follows J2's stored-exponent ordering, separate fraction/GRS operations,
+normalization gate, half-bit promotion and J11 carry. It distinguishes the
+retained right-shift result from the later tail calculation. The original
+shifter patent supplies the read/load interface distinction. Large-count
+rounding selection, exact-cancellation C1 and unnormal range completion remain
+open rather than being filled in from canonical arithmetic.
+
+The [partial remainder reconstruction](research/PARTIAL_FPREM.md) follows
+FPREM's stored-exponent selection, C2, divider invocation and result tail.
+The long path remains selected even if a normalized fallback returns zero.
+The reduction count and quotient initialization are still incomplete; the
+current 32-trial fallback is not treated as the recovered original algorithm.
+
 Table A-2, printed S-112 through S-114, explicitly assigns operations to nine
 register encoding groups that Intel's translators do not emit. The decoder
 accepts these 72 forms. [The encoding investigation](research/ALTERNATE_ENCODINGS.md)

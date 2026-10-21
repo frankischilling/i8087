@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "i8087.h"
+#include "original_add.h"
 #include "soft80.h"
 #include "transcend.h"
 #include <string.h>
@@ -280,43 +281,25 @@ static void compare(transaction *t, i8087_f80 a, i8087_f80 b, unsigned pops) {
         pop(t);
 }
 
-static bool unnormal_plus_zero(const transaction *t, i8087_f80 a, i8087_f80 b, unsigned a_tag,
-                               unsigned b_tag, unsigned p, unsigned rc, sf_result *out) {
-    i8087_f80 raw;
-    unsigned exponent;
+static bool original_operand(i8087_f80 x, unsigned tag) {
+    unsigned exponent = x.sign_exponent & 0x7fff;
+    if (tag == I8087_TAG_ZERO)
+        return !x.significand && !exponent;
+    return tag == I8087_TAG_VALID && x.significand && exponent >= 0x0041 && exponent <= 0x7ffd;
+}
+
+static bool unnormal_addition(transaction *t, i8087_f80 a, i8087_f80 b, unsigned a_tag,
+                              unsigned b_tag, unsigned p, unsigned rc, sf_result *out) {
+    original_add_status status;
     if (((t->f.control >> 8) & 3) == 1 || (t->raised & I8087_DE))
         return false;
-    if (a_tag == I8087_TAG_ZERO && !a.significand && !(a.sign_exponent & 0x7fff) &&
-        b_tag == I8087_TAG_VALID)
-        raw = b;
-    else if (b_tag == I8087_TAG_ZERO && !b.significand && !(b.sign_exponent & 0x7fff) &&
-             a_tag == I8087_TAG_VALID)
-        raw = a;
-    else
+    if (!(sf_unnormal(a) || sf_unnormal(b)) || !original_operand(a, a_tag) ||
+        !original_operand(b, b_tag))
         return false;
-    exponent = raw.sign_exponent & 0x7fff;
-    if (!sf_unnormal(raw) || !raw.significand || exponent < 0x0041 || exponent > 0x7ffd)
-        return false;
-    /* J2 aligns only zero bits and skips normalization. J11 rounds the stored
-       alignment at reduced PC, without changing the exponent or VALID tag.
-       See research/UNNORMAL_REDUCED_PRECISION.md for the bounded source path. */
-    *out = (sf_result){raw, 0, false, {0}};
-    if (p < 64) {
-        uint64_t unit = UINT64_C(1) << (64 - p);
-        uint64_t residue = raw.significand & (unit - 1);
-        uint64_t half = unit >> 1;
-        bool increment = false;
-        if (rc == 0)
-            increment = residue > half || (residue == half && (raw.significand & unit));
-        else if (rc == 1)
-            increment = residue && sf_sign(raw);
-        else if (rc == 2)
-            increment = residue && !sf_sign(raw);
-        out->value.significand = (raw.significand & ~(unit - 1)) + (increment ? unit : 0);
-        out->flags = residue ? I8087_PE : 0;
-        out->rounded_up = increment;
-    }
-    return true;
+    status = original_add(a, b, p, rc, out);
+    if (status == ORIGINAL_ADD_RANGE)
+        gap(t, I8087_GAP_RANGE_EXCEPTION);
+    return status == ORIGINAL_ADD_COMPLETE;
 }
 
 static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_f80 a, i8087_f80 b,
@@ -343,7 +326,7 @@ static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_
         if (sf_kind(a) == SF_INFINITY && sf_kind(b) == SF_INFINITY &&
             !(t->f.control & I8087_AFFINE))
             r = (sf_result){sf_indefinite(), I8087_IE, false, {0}};
-        else if (!unnormal_plus_zero(t, a, b, a_tag, b_tag, p, rc, &r)) {
+        else if (!unnormal_addition(t, a, b, a_tag, b_tag, p, rc, &r)) {
             if (sf_unnormal(a) || sf_unnormal(b) || sf_denormal(a) || sf_denormal(b))
                 gap(t, I8087_GAP_UNNORMAL);
             r = sf_add(a, b, p, rc);
@@ -757,9 +740,17 @@ static void remainder_instruction(transaction *t) {
         r = sf_indefinite();
         t->f.status &= (uint16_t)~I8087_C2;
     } else {
+        bool stored_partial =
+            read_tag(t, 0) == I8087_TAG_VALID && read_tag(t, 1) == I8087_TAG_VALID &&
+            a.significand && sf_kind(b) == SF_FINITE &&
+            (int32_t)(a.sign_exponent & 0x7fff) - (int32_t)(b.sign_exponent & 0x7fff) >= 64;
         r = sf_remainder(a, b, &q, &partial, &width);
-        if (partial) {
+        if (partial || stored_partial) {
             /* This bounded reduction is not the original microcode sequence. */
+            /* #1607/#1614 select long reduction from stored exponents, before
+               any normalization of a VALID unnormal dividend. See
+               research/PARTIAL_FPREM.md. A canonical zero fallback is still
+               partial on this path and cannot be accepted in strict mode. */
             gap(t, I8087_GAP_PARTIAL_REMAINDER);
             t->f.status |= I8087_C2;
         } else {

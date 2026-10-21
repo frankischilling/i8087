@@ -1228,6 +1228,61 @@ static void unnormal_zero_reduced_precision(void) {
                             }
 }
 
+static void remainder_stored_exponent_selection(void) {
+    unsigned distance, sign, divisor_sign, pc, rc, top, history, old_c2, sticky, policy;
+    for (distance = 64; distance <= 66; ++distance)
+        for (sign = 0; sign < 2; ++sign)
+            for (divisor_sign = 0; divisor_sign < 2; ++divisor_sign)
+                for (pc = 0; pc < 4; ++pc)
+                    for (rc = 0; rc < 4; ++rc)
+                        for (top = 0; top < 8; ++top)
+                            for (history = 0; history < 8; ++history)
+                                for (old_c2 = 0; old_c2 < 2; ++old_c2)
+                                    for (sticky = 0; sticky < 2; ++sticky)
+                                        for (policy = 0; policy < 2; ++policy) {
+                                            i8087 f, before, expected;
+                                            unsigned i;
+                                            i8087_init(&f);
+                                            f.control = (uint16_t)(0xbf | (pc << 8) | (rc << 10));
+                                            f.status = (uint16_t)((top << 11) | cc_from_q(history) |
+                                                                  (old_c2 ? I8087_C2 : 0) |
+                                                                  (sticky ? 0x3f : 0));
+                                            f.policy = policy ? I8087_ALLOW_APPROXIMATION
+                                                              : I8087_STOP_ON_UNVERIFIED;
+                                            for (i = 0; i < 8; ++i)
+                                                number(&f, i, integer((int)i + 11));
+                                            slot(&f, 0,
+                                                 (i8087_f80){1, (uint16_t)((0x3fff + distance) |
+                                                                           (sign << 15))},
+                                                 I8087_TAG_VALID);
+                                            slot(&f, 1,
+                                                 (i8087_f80){JBIT, (uint16_t)(0x3fff | (divisor_sign
+                                                                                        << 15))},
+                                                 I8087_TAG_VALID);
+                                            before = expected = f;
+                                            if (policy) {
+                                                slot(&expected, 0,
+                                                     (i8087_f80){0, (uint16_t)(sign << 15)},
+                                                     I8087_TAG_ZERO);
+                                                expected.status |= I8087_C2;
+                                            }
+                                            CHECK(op(&f, 0xd9, 0xf8) ==
+                                                  (policy ? I8087_OK : I8087_UNVERIFIED));
+                                            CHECK(same_registers(&f, &expected));
+                                            CHECK(f.status == expected.status);
+                                            CHECK(f.control == expected.control);
+                                            CHECK(f.last_gap == I8087_GAP_PARTIAL_REMAINDER);
+                                            CHECK(f.used_approximations ==
+                                                  (policy ? (uint32_t)I8087_GAP_PARTIAL_REMAINDER
+                                                          : 0u));
+                                            if (!policy) {
+                                                CHECK(f.instruction_address ==
+                                                      before.instruction_address);
+                                                CHECK(f.opcode == before.opcode);
+                                            }
+                                        }
+}
+
 int main(void) {
     extract_fields();
     remainder_flags();
@@ -1242,6 +1297,7 @@ int main(void) {
     alternate_register_encodings();
     unnormal_zero_arithmetic();
     unnormal_zero_reduced_precision();
+    remainder_stored_exponent_selection();
     printf(
         "PASS: %lu original-8087 regression assertions (document-derived, not hardware captures)\n",
         checks);

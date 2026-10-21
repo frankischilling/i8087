@@ -7,6 +7,12 @@ bit-exact or cycle-exact Intel 8087. No original 8087 was available for executio
 no physical-hardware trace corpus was used, and no target silicon revision has
 been selected. The supplied capture probe has not been run on physical hardware.
 
+Physical hardware access is outside the required scope. Completion is assessed
+from original documentation, first-hand online research and comprehensive
+independent software tests. Published captures are optional corroboration.
+The absence of private hardware alone is not a blocker; unresolved behavior,
+missing implementation and unsupported accuracy claims still matter.
+
 The tests establish agreement with sampled exact mathematical calculations,
 document-derived instruction expectations and API invariants. They do not
 establish agreement with all 8087 datapath, microcode, reserved-bit, asynchronous
@@ -18,10 +24,10 @@ exception or electrical behavior. Passing counts must not be presented as an
 | Area | Implemented and exercised | Remaining qualification |
 | --- | --- | --- |
 | State | Eight raw 80-bit physical registers, TOP, tags, control/status and pointers | Public struct is not packed; arbitrary inconsistent tags/values are not certified |
-| Transfers | Register/tag-preserving transfers; 32/64/80-bit real, signed integer, valid packed BCD formats | Noncanonical/invalid BCD cases and exact NaN payload rules need hardware evidence |
-| Finite arithmetic | Integer-software add, subtract, multiply, divide, square root, rounding; 24/53/64-bit precision and four rounding modes; bounded unnormal-plus-zero add/subtract rounds the stored alignment and retains its exponent | General original unnormal significance propagation remains guarded |
+| Transfers | Register/tag-preserving transfers; 32/64/80-bit real, signed integer, valid packed BCD formats | Noncanonical/invalid BCD cases and exact NaN payload rules need further source research and reference tests |
+| Finite arithmetic | Integer-software arithmetic; separate original add/subtract datapath for stored alignment, significance gates, fraction/GRS arithmetic and PC24/53/64 rounding | Nonzero alignment shifts of at least 64, cancellation C1, pseudozero inputs and unnormal range completion remain guarded; multiply/divide still use canonical fallbacks for unnormals |
 | FXTRACT | Raw-field decomposition, signed-zero pair, finite unnormal/pseudozero handling | Infinity/NaN result pairs remain guarded; finite results are document-derived, not silicon-certified |
-| FPREM | Complete finite remainder with original quotient-flag history; precision-control independent | Partial-reduction sequence and tiny-result range processing remain guarded |
+| FPREM | Complete finite remainder and modeled quotient history; precision-control independent; stored-exponent long reductions remain guarded even when canonical normalization would finish | Partial divider/count controls, raw unnormal quotient history and tiny-result range processing remain unresolved |
 | FSCALE | Zero-tag short circuits, in-range exponent-only scaling, original finite scale domain | Several exceptional/range inputs remain guarded or unverified |
 | FPTAN | Zero and positive normal operands with stored exponent <= 0x3fbf bypass the fallback | Full CORDIC/rational datapath, rounding, two raw outputs and flags remain approximate |
 | Other transcendentals | F2XM1 canonical signed-zero early return; explicit opt-in fallbacks for other inputs | General F2XM1/FYL2X/FYL2XP1/FPATAN algorithms are not original microcode; no original-result bit-equivalence claim |
@@ -48,7 +54,7 @@ validated on original hardware.
 | Flag | Current guard/fallback |
 | --- | --- |
 | `I8087_GAP_TRANSCENDENTAL` | General software transcendental algorithms in place of original microcode; excludes canonical signed-zero F2XM1 and the tiny/zero FPTAN bypass |
-| `I8087_GAP_UNNORMAL` | General significance propagation and selected tiny unnormal conversions; excludes bounded unnormal-plus-zero arithmetic at documented PC settings |
+| `I8087_GAP_UNNORMAL` | Remaining significance, large-alignment, cancellation and tiny-conversion paths; excludes the supported original finite-add datapath and bounded unnormal-plus-zero arithmetic |
 | `I8087_GAP_RANGE_EXCEPTION` | Remaining range paths, including reduced-PC masked underflow, masked CHOP overflow, and unsupported remainder/range combinations |
 | `I8087_GAP_EXCEPTION_RESTART` | Unmasked invalid comparison continuation and register range cases without a supported wrapped result |
 | `I8087_GAP_PARTIAL_REMAINDER` | Bounded software partial reduction instead of original microcode sequence |

@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           ctest --test-dir build -C ${{ matrix.build_type }} --show-only=json-v1 > build/test-inventory.json
-          python -c "import json; names={t['name'] for t in json.load(open('build/test-inventory.json'))['tests']}; required={'instructions','original_8087_regressions','raw_state_safety','rational_oracle','instruction_fraction_oracle','trace_tool_contracts'}; assert required <= names, required - names"
+          python -c "import json; names={t['name'] for t in json.load(open('build/test-inventory.json'))['tests']}; required={'instructions','original_8087_regressions','original_add_datapath','raw_state_safety','rational_oracle','instruction_fraction_oracle','original_add_fraction_oracle','trace_tool_contracts'}; assert required <= names, required - names"
       - name: Test
         run: >-
           ctest --test-dir build -C ${{ matrix.build_type }}

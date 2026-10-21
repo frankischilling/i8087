@@ -1,9 +1,10 @@
 # Validation report
 
-Run on 2026-10-20 in a Linux x86_64 container. These are software tests, not
-original-8087 hardware measurements.
+Initial validation ran on 2026-10-20 in a Linux x86_64 container. Later Windows
+and hosted updates appear below. These are software tests, not original-8087
+hardware measurements.
 
-## Build configurations actually exercised
+## Initial build configurations
 
 | Configuration | Result |
 | --- | --- |
@@ -18,7 +19,7 @@ Compiler warnings: `-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Werror`.
 The initial Linux run did not test the minimum supported Python interpreter,
 Windows/MSVC or non-x86 hosts. Later hosted and Windows results are recorded below.
 
-## Actual test output
+## Initial test output
 
 ```text
 PASS: 12717 instruction/API assertions (including all 2048 ESC/ModR/M pairs)
@@ -282,3 +283,48 @@ bit operations. They check every saved register, tag, status bit and guard.
 The [reduced-precision derivation](research/UNNORMAL_REDUCED_PRECISION.md) records
 why these expectations differ from canonical arithmetic. No physical capture
 has established them as original-chip measurements.
+
+## Original finite-add datapath
+
+The separate C subsystem uses stored-exponent alignment, fraction/GRS add and
+subtract, the decoded normalization gate, half-bit promotion and raw PC
+rounding. Canonical backend operations retain their independent mathematical
+tests. Integration currently requires properly tagged nonzero finite inputs
+with stored E from `0041` through `7ffd`, or a canonical zero, and at least
+one unnormal. Fresh DE, reserved PC, nonzero alignment counts of at least 64,
+exact-cancellation C1 and unnormal range completion remain guarded.
+
+The `original_add_datapath` suite crosses 22 literal cases through 709,632
+register executions, with all nine operation/destination/pop forms, indices,
+TOP, both operand orders, signs, masks, sticky flags, initial C1 and policies.
+Another 4,608 executions check short/long real and integer nonzero memory
+operands. Private-path controls check half-bit promotion, range rejection and
+the predicted cancellation payload without declaring C1 known. The new first
+acceptance check fails when linked to the earlier instruction core.
+
+The `original_add_fraction_oracle` suite checks 30,000 seeded inputs by choosing
+the source-prescribed alignment and rounding exact signed Python Fractions.
+It uses no C bit-operation implementation or host floating point to calculate
+the result. It also replays all 46,080 finite-add capture inputs, checking
+25,344 supported raw outcomes and preserving the state of 20,736 guarded rows.
+These expectations exercise the reconstruction; they do not independently
+prove the physical chip follows it. CI requires both new suites alongside the
+six existing suites.
+
+[The source investigation](research/FINITE_ADD_SUBTRACT.md) distinguishes
+resolved arithmetic branches from missing large-count GRS and cancellation
+condition writes. No original-hardware output has been supplied for this work.
+
+The FPREM regression adds 98,304 cases with stored exponent differences of
+64, 65 and 66 but numerically small unnormal dividends. The previous core
+incorrectly accepted a normalized zero as a completed step; the new guard
+check fails against that behavior. Strict mode preserves all state and
+reports the unresolved partial path. Opt-in fallback remains labeled and
+sets C2 even when its value is zero. PC/RC, TOP, old quotient flags, both
+signs, old C2 and sticky flags are crossed. This verifies the decoded outer
+selection, not the still-unresolved divider count or partial quotient bits.
+
+All eight suites pass locally with GCC and MSVC on Windows and Clang with
+ASan/UBSan under Linux for the finite-add implementation. Hosted checks are
+required on the final pull request head. Physical hardware is optional
+corroboration and is not a prerequisite for completing source-backed work.
