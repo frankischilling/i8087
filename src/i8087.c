@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "i8087.h"
 #include "original_add.h"
+#include "original_remainder.h"
 #include "soft80.h"
 #include "transcend.h"
 #include <string.h>
@@ -239,7 +240,7 @@ static void accept_numeric(transaction *t, sf_result *r) {
                 gap(t, I8087_GAP_RANGE_EXCEPTION);
             }
         } else {
-            /* Masked register underflow + reduced PC needs silicon vectors. */
+            /* Reduced-PC masked underflow needs a separate J16 rounding derivation. */
             if (((t->f.control >> 8) & 3) != 3)
                 gap(t, I8087_GAP_RANGE_EXCEPTION);
         }
@@ -285,18 +286,30 @@ static bool original_operand(i8087_f80 x, unsigned tag) {
     unsigned exponent = x.sign_exponent & 0x7fff;
     if (tag == I8087_TAG_ZERO)
         return !x.significand && !exponent;
-    return tag == I8087_TAG_VALID && x.significand && exponent >= 0x0041 && exponent <= 0x7ffd;
+    return tag == I8087_TAG_VALID && x.significand && exponent >= 1 && exponent <= 0x7ffe;
 }
 
-static bool unnormal_addition(transaction *t, i8087_f80 a, i8087_f80 b, unsigned a_tag,
-                              unsigned b_tag, unsigned p, unsigned rc, sf_result *out) {
+static bool original_addition(transaction *t, i8087_f80 a, i8087_f80 b, unsigned a_tag,
+                              unsigned b_tag, unsigned p, unsigned rc, sf_result *out,
+                              bool *preserve_c1) {
     original_add_status status;
+    bool unnormal = sf_unnormal(a) || sf_unnormal(b);
+    unsigned ae = a.sign_exponent & 0x7fff, be = b.sign_exponent & 0x7fff;
     if (((t->f.control >> 8) & 3) == 1 || (t->raised & I8087_DE))
         return false;
-    if (!(sf_unnormal(a) || sf_unnormal(b)) || !original_operand(a, a_tag) ||
-        !original_operand(b, b_tag))
+    if (!original_operand(a, a_tag) || !original_operand(b, b_tag))
+        return false;
+    if (!unnormal &&
+        !((!a.significand && !b.significand) ||
+          (a.significand == b.significand && (a.sign_exponent ^ b.sign_exponent) == 0x8000)))
         return false;
     status = original_add(a, b, p, rc, out);
+    if (status == ORIGINAL_ADD_C1_UNCHANGED) {
+        *preserve_c1 = true;
+        return true;
+    }
+    if ((ae && (ae < 0x0041 || ae > 0x7ffd)) || (be && (be < 0x0041 || be > 0x7ffd)))
+        return false;
     if (status == ORIGINAL_ADD_RANGE)
         gap(t, I8087_GAP_RANGE_EXCEPTION);
     return status == ORIGINAL_ADD_COMPLETE;
@@ -306,6 +319,8 @@ static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_
                        unsigned a_tag, unsigned b_tag, bool do_pop) {
     sf_result r;
     unsigned p = precision(t), rc = rounding(t);
+    uint16_t old_c1 = t->f.status & I8087_C1;
+    bool preserve_c1 = false;
     check_denormal(t, a);
     check_denormal(t, b);
     if (operation == 5 || operation == 7) {
@@ -326,7 +341,7 @@ static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_
         if (sf_kind(a) == SF_INFINITY && sf_kind(b) == SF_INFINITY &&
             !(t->f.control & I8087_AFFINE))
             r = (sf_result){sf_indefinite(), I8087_IE, false, {0}};
-        else if (!unnormal_addition(t, a, b, a_tag, b_tag, p, rc, &r)) {
+        else if (!original_addition(t, a, b, a_tag, b_tag, p, rc, &r, &preserve_c1)) {
             if (sf_unnormal(a) || sf_unnormal(b) || sf_denormal(a) || sf_denormal(b))
                 gap(t, I8087_GAP_UNNORMAL);
             r = sf_add(a, b, p, rc);
@@ -345,6 +360,8 @@ static void arithmetic(transaction *t, unsigned operation, unsigned dest, i8087_
         }
     }
     accept_numeric(t, &r);
+    if (preserve_c1)
+        t->f.status = (uint16_t)((t->f.status & ~I8087_C1) | old_c1);
     set_st(&t->f, dest, r.value);
     if (do_pop)
         pop(t);
@@ -723,7 +740,7 @@ static void extract(transaction *t) {
 }
 
 static void remainder_instruction(transaction *t) {
-    i8087_f80 a = read_st(t, 0), b = read_st(t, 1), r;
+    i8087_f80 a = read_st(t, 0), b = read_st(t, 1), r = a;
     uint8_t q = 0;
     bool partial = false;
     unsigned width = 0;
@@ -740,17 +757,35 @@ static void remainder_instruction(transaction *t) {
         r = sf_indefinite();
         t->f.status &= (uint16_t)~I8087_C2;
     } else {
+        bool original = false, uncertain_history = false;
         bool stored_partial =
             read_tag(t, 0) == I8087_TAG_VALID && read_tag(t, 1) == I8087_TAG_VALID &&
             a.significand && sf_kind(b) == SF_FINITE &&
             (int32_t)(a.sign_exponent & 0x7fff) - (int32_t)(b.sign_exponent & 0x7fff) >= 64;
-        r = sf_remainder(a, b, &q, &partial, &width);
-        if (partial || stored_partial) {
-            /* This bounded reduction is not the original microcode sequence. */
-            /* #1607/#1614 select long reduction from stored exponents, before
-               any normalization of a VALID unnormal dividend. See
-               research/PARTIAL_FPREM.md. A canonical zero fallback is still
-               partial on this path and cannot be accepted in strict mode. */
+        if (read_tag(t, 0) == I8087_TAG_VALID && read_tag(t, 1) == I8087_TAG_VALID &&
+            (sf_kind(a) == SF_FINITE || sf_unnormal(a)) && sf_kind(b) == SF_FINITE &&
+            (a.sign_exponent & 0x7fff) && (b.sign_exponent & 0x7fff) && (b.significand & JBIT)) {
+            original_remainder_result result;
+            original_remainder_status status = original_remainder(a, b, &result);
+            if (status != ORIGINAL_REMAINDER_RANGE) {
+                original = true;
+                r = result.value;
+                q = result.quotient;
+                partial = result.partial;
+                width = result.width;
+                uncertain_history = status == ORIGINAL_REMAINDER_HISTORY;
+            } else
+                gap(t, I8087_GAP_RANGE_EXCEPTION);
+        }
+        if (!original) {
+            r = sf_remainder(a, b, &q, &partial, &width);
+            partial = partial || stored_partial;
+            uncertain_history = partial;
+        }
+        if (uncertain_history) {
+            /* Keep the old quotient flags only as an opt-in fallback where
+               original partial history is unresolved. R and C2 still follow
+               the original stored-count reduction when available. */
             gap(t, I8087_GAP_PARTIAL_REMAINDER);
             t->f.status |= I8087_C2;
         } else {
@@ -768,6 +803,8 @@ static void remainder_instruction(transaction *t) {
                 t->f.status |= I8087_C1;
             if (q & 2)
                 t->f.status |= I8087_C3;
+            if (partial)
+                t->f.status |= I8087_C2;
         }
         if (sf_denormal(r)) {
             t->raised |= I8087_UE;

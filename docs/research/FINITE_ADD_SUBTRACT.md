@@ -3,8 +3,9 @@
 Research date: 2026-10-20. This records the full J2 path for two nonzero finite
 operands, including normal/unnormal combinations. It is a reconstruction from
 Intel documents and the published die decode, not an original-hardware trace.
-Raw arithmetic is substantially determined; exact-cancellation C1 and a few
-control assumptions below still need independent confirmation.
+The functional reconstruction includes stored alignment, raw rounding and
+source-derived C1 preservation on exact cancellation. Unnormal range completion
+and exceptional input preprocessing remain separate work.
 
 ## Representation and entry
 
@@ -43,10 +44,9 @@ snapshot is `745f0a9c6d4fdfc1b5d6c41b6ae0d2a98a4be03d`.
 2. **Align B.** Produce its truncated fraction and GRS information for a
    right shift of d. A useful integer representation is
    `X = S_A << 3`, `Y = shift_right_jam(S_B << 3, d)`.
-   Jam means OR all discarded bits into bit 0. This compact representation is
-   conditional on resolving the exponent-dependent GRS construction, especially
-   the d-at-least-64 path below. Carry/sign storage must extend beyond the
-   67 fraction-plus-GRS positions.
+   Jam means OR all discarded bits into bit 0, following Intel's original
+   definition of GRS. Carry/sign storage must extend beyond the 67
+   fraction-plus-GRS positions.
 3. **Same effective signs:** form `T = X + Y`. If the fraction has a carry
    beyond bit 63, right shift T once with jamming and record a one-bit exponent
    increase. Otherwise do not left-normalize. This applies to unnormal sums
@@ -105,15 +105,19 @@ stored exponent ordering differs from their numeric magnitude are essential
 discriminators. Intel's broad S-70 wording must not replace this raw branch
 with an ordinary normalized magnitude comparison.
 
-**Large-count GRS remains unresolved.** For d at least 64, `#0525` supplies a
+For d at least 64, `#0525` supplies a
 zero fraction, `#0526` performs a left shift of zero places on the original
 operand, and `#0532` loads rounding(H). This does not by itself prove the
 generic-jam layouts for d=64 or d=65. The report's note 17 explicitly omits
 exponent-converter-dependent distinctions between rounding-bit operations.
-Keep this branch guarded until that circuit selection is decoded or original
-hardware supplies discriminating traces. The d=64 result rows below are
-conditional predictions of the mathematical GRS layout, not established
-hardware expectations.
+Intel's original processor patent supplies the functional rule: guard and
+round are the first two discarded bits, and sticky records any other discarded
+one. Section E applies that definition to each quantity, including bits lost
+through alignment. Combined with J2's stored alignment and J11's raw precision
+grid, this specifies the large-count result without importing a later x87
+rule. The implementation uses that original specification. It does not claim
+to decode every exponent-converter input or to have measured those gates.
+[Intel's GRS definition and section E](https://patents.google.com/patent/US4338675A/en).
 
 For a raw input fraction with no incoming GRS, the required ordinary alignment
 layouts at the boundary are:
@@ -131,11 +135,11 @@ ORs the remainder. For d=64, `#0526` also left shifts by zero, but the required
 GRS row differs. It must therefore depend on exponent-converter-controlled
 selection, not just the visible shifter output. Neither `main.cpp` nor the
 recovered BC-operation notes decode raw `680a` at `#0532` into that truth table.
-The patent gives the general GRS architecture but not these raw control-word
-selectors. Rows 64 and above are requirements to discriminate, not a circuit
-proof that the chip implements generic jamming there. In particular, the
-possibility that the large-count path collapses a nonzero fraction to sticky
-must be tested rather than assumed away.
+The patent specifies the functional GRS behavior but not these raw control-word
+selectors. Rows 64 and above are therefore source-derived expectations rather
+than a transistor-level proof of `680a`. Literal raw-state tests at these
+boundaries distinguish guard, round and sticky placement. Any stronger source
+showing an original-chip deviation must be reconciled with the patent rule.
 [Rounding extraction and omitted details, note 17](https://www.righto.com/2026/09/8087-microcode-reverse-engineering-fscale.html),
 [raw J20](https://github.com/a-mcego/granite/blob/745f0a9c6d4fdfc1b5d6c41b6ae0d2a98a4be03d/tools/8087mc/bin/8087mc_out.txt#L523).
 
@@ -202,17 +206,16 @@ and zero-rounded VALID tag are detailed in
 connects P to OR(G,R,S) at rounding and specifies result delivery even when
 precision is unmasked. [Intel rounding circuitry](https://patents.google.com/patent/US4338675A/en).
 
-## Open boundaries
+## Cancellation status and remaining boundaries
 
-**Exact-cancellation C1 remains unresolved.** The decoded common entry contains
-no explicit C1 clear, and the cancellation tail returns before J11's documented
-C1 update. That does not prove preservation: an instruction-start action,
-shared sign-latch storage or another implicit write needs circuit evidence.
-Seed both C1 states and both operand signs in captures. Do not assign C1 from
-J11 when J11 did not execute. The provisional condition table and generated
-listing are not an exhaustive control-register write specification.
-[C1 mechanism and limitations](https://www.righto.com/2026/09/8087-microcode-reverse-engineering-fscale.html),
-[provisional condition descriptions](https://www.righto.com/2025/12/8087-microcode-conditions.html).
+The [C1 writer audit](CANCELLATION_C1.md) supports preserving incoming C1 on
+exact cancellation and both-ZERO early returns. The common arithmetic path
+contains no identified C1 write, and these branches bypass J11's condition
+`1d`. Cancellation tests condition `2d`, a separate sign-response predicate.
+Original FPREM history and comparison/pop rules also exclude universal
+instruction-start or pop-induced clearing. The implementation follows this
+source-derived reconstruction; it does not claim electrical certification.
+An exact nonzero result reaching J11 still clears C1 when no increment occurs.
 
 J2 returns the raw result to the common range check at `#0010`. Underflow,
 overflow, mask handling and exponent wrapping then belong to J16. They must
@@ -224,8 +227,8 @@ electrical timing of the datapath.
 ## Literal discriminating cases
 
 Use VALID tags for the nonzero inputs, PC64 and nearest/even unless stated.
-Results below are predictions from the decoded path, pending hardware capture.
-The d=64 rows additionally depend on the unresolved large-count GRS mapping.
+Results below are expectations from the decoded path and original GRS rules.
+No physical execution capture is supplied.
 All non-cancellation rows should finish through J11 with C1 clear and no new
 PE unless the row says otherwise.
 
@@ -241,9 +244,9 @@ PE unless the row says otherwise.
 | `3fff:8000000000000000 - 3ffe:ffffffffffffffff` | `3fbf:8000000000000000`, VALID | GRS-only half-bit promotion, then long normalization. |
 | `403f:0000000000000001 - 3fff:8000000000000000` | `403f:0000000000000000`, VALID; PE set, C1 clear | d=64, raw half-quantum rounds to pseudozero. |
 | Previous row with RC up | `403f:0000000000000001`, VALID; PE and C1 set | Directed rounding uses the original raw quantum. |
-| `4000:4000000000000000 - 4000:4000000000000000` | `4000:0000000000000000`, VALID | Exact unnormal cancellation yields pseudozero. C1 unresolved. |
+| `4000:4000000000000000 - 4000:4000000000000000` | `4000:0000000000000000`, VALID | Exact unnormal cancellation yields pseudozero and preserves C1. |
 | Previous row with RC down | `c000:0000000000000000`, VALID | Cancellation sign rule applies to the retained-E pseudozero. |
-| `3fff:8000000000000000 - 3fff:8000000000000000` | `0000:0000000000000000`, ZERO | Normal cancellation takes the whole-zero transfer. C1 unresolved. |
+| `3fff:8000000000000000 - 3fff:8000000000000000` | `0000:0000000000000000`, ZERO | Normal cancellation takes the whole-zero transfer and preserves C1. |
 
 Extend these with d equal to 0, 1, 2, 63, 64, 65, 66 and a large value;
 tails below, at and above each PC half-way point; both operand orders and
@@ -261,14 +264,18 @@ canonical zero, when at least one input is unnormal. It keeps fresh DE and
 reserved PC outside this path. The bounded unnormal-plus-zero results remain
 unchanged.
 
-Nonzero shifts of at least 64 return an unresolved-alignment status. Exact
-cancellation returns its predicted payload with an unresolved-C1 status.
-Neither status is accepted as a strict-mode result. Unsupported unnormal range
-completion also retains its guard. A correct finite payload alone does not
-establish correct condition bits or exception continuation.
+All stored exponent distances use the original GRS definition, including
+64, 65 and the sticky-only tail from 66 onward. Exact cancellation and canonical
+both-zero inputs return a separate C1-preserve action. The instruction layer
+accepts those early completions throughout stored E `0001` through `7ffe`,
+including normal cancellation, while retaining the narrower interval for
+ordinary unnormal arithmetic. Unsupported unnormal range completion retains
+its guard. A correct finite payload alone does not establish correct condition
+bits or exception continuation.
 
 [Validation](../TESTING.md#original-finite-add-datapath) includes literal raw
 results, an independent Fraction calculation and a masked capture campaign.
-The campaign includes the unresolved cancellation and large-count branches so
-physical evidence can distinguish them. No hardware pass or issue completion
-is inferred from model-only tests.
+The campaign includes large-count boundaries and both initial C1 states for cancellation.
+Software tests check the source-derived expectations and strict guard state;
+published physical results would provide optional corroboration. No hardware
+pass or issue completion is inferred from model-only tests.

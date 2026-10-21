@@ -14,8 +14,8 @@ no intervening precision-adjustment call before the register write.
 This is a strong implementation hypothesis based on the decoded path, not a
 measurement of a named 8087 specimen. It should not be generalized to unnormal
 results, memory stores or the unresolved CHOP case. The instruction layer follows
-Intel's explicit directed-overflow flag rule; that policy still needs hardware
-validation alongside the raw result.
+Intel's explicit directed-overflow flag rule, with independent software tests
+for the raw result and flags. Physical comparison is optional corroboration.
 
 ## Intel specification and the printed discrepancy
 
@@ -122,7 +122,7 @@ flags to hardware, whose full directed-rounding behavior has not been decoded
 here. Keep the source-based status expectation distinct from a verified silicon
 claim, and test the status policy separately from the significand correction.
 
-A complete follow-up should repeat the six register cases on identified
-original specimens, add corresponding FST32/FST64 cases, and record which
-specification and die interpretation each expectation follows. The current
-register-only hardware collector cannot execute the memory-store fixtures.
+Software tests cover the six register cases and corresponding FST32/FST64
+cases, identifying which specification and die interpretation each expectation
+follows. Optional published captures could corroborate these results. The
+current register-only hardware collector cannot execute memory-store fixtures.

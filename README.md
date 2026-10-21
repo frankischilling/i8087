@@ -38,8 +38,8 @@ Control=03bf Status=0000 Tags=ffff
 A direct build is also possible:
 
 ```sh
-cc -std=c11 -O2 -Iinclude -Isrc src/i8087.c src/soft80.c src/original_add.c src/transcend.c \
-  examples/demo.c -o i8087_demo
+cc -std=c11 -O2 -Iinclude -Isrc src/i8087.c src/soft80.c src/original_add.c \
+  src/original_remainder.c src/transcend.c examples/demo.c -o i8087_demo
 ```
 
 On multi-configuration CMake generators, add `--config Release` to the build,
@@ -54,6 +54,7 @@ and MSVC on Windows. MinGW GCC also passes the suites locally.
 | `src/i8087.c` | Instruction decoding, state, transfers, exception handling |
 | `src/soft80.c` | Integer-software arithmetic and format conversion |
 | `src/original_add.c` | Original finite-add fraction/GRS datapath and significance |
+| `src/original_remainder.c` | Stored-exponent remainder reduction and quotient history |
 | `src/transcend.c` | Guarded, non-bit-exact transcendental fallbacks |
 | `tests/` | Instruction regressions, rational oracles, raw-state safety tests |
 | `tools/` | Input-vector generation, C replay, trace comparison |

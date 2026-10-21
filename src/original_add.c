@@ -11,8 +11,11 @@ typedef struct fraction_grs {
 static fraction_grs align_fraction(uint64_t fraction, unsigned distance) {
     fraction_grs value = {fraction, 0};
     unsigned i;
-    /* Each shift retains guard/round and jams the remaining tail. Large
-       nonzero shifts are rejected before this helper, pending J20 decoding. */
+    /* Intel's original GRS definition retains every shifted-out bit. Once
+       all 64 fraction bits and both explicit tail bits have left, only the
+       sticky bit can remain, independent of a still larger count. */
+    if (distance >= 66)
+        return (fraction_grs){0, fraction ? 1u : 0u};
     for (i = 0; i < distance && (value.fraction || value.grs); ++i) {
         value.grs = (unsigned)((value.fraction & 1) << 2) | (value.grs >> 1) | (value.grs & 1);
         value.fraction >>= 1;
@@ -74,11 +77,11 @@ original_add_status original_add(i8087_f80 a, i8087_f80 b, unsigned precision, u
         exponent_b = temporary_exponent;
     }
     *out = (sf_result){{0, 0}, 0, false, {0}};
+    if (!a.significand && !b.significand && !exponent_a && !exponent_b) {
+        out->value = sf_zero(sf_sign(a) == sf_sign(b) ? sf_sign(a) : rc == 1);
+        return ORIGINAL_ADD_C1_UNCHANGED;
+    }
     distance = exponent_a - exponent_b;
-    /* J20's exponent-dependent rounding(H) circuit needs a separate derivation
-       for these counts. Do not replace it with an assumed generic jam shift. */
-    if (distance >= 64 && b.significand)
-        return ORIGINAL_ADD_ALIGNMENT;
     left = (fraction_grs){a.significand, 0};
     right = align_fraction(b.significand, distance);
     exponent = (int32_t)exponent_a;
@@ -105,11 +108,11 @@ original_add_status original_add(i8087_f80 a, i8087_f80 b, unsigned precision, u
         value.fraction = left.fraction - right.fraction - (left.grs < right.grs);
         value.grs = (left.grs - right.grs) & 7;
         if (!value.fraction && !value.grs) {
-            /* J2 returns before J11 here. Preserve the predicted raw zero but
-               leave its C1 behavior guarded until implicit writes are known. */
+            /* J2 returns before the J11 condition that writes C1. Preserve
+               that status bit independently of the raw zero construction. */
             out->value.sign_exponent =
                 (uint16_t)((a.significand & JBIT ? 0 : exponent_a) | (rc == 1 ? 0x8000 : 0));
-            return ORIGINAL_ADD_CANCELLATION_CC;
+            return ORIGINAL_ADD_C1_UNCHANGED;
         }
         if (!value.fraction) {
             if (a.significand & JBIT) {

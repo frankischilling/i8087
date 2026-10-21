@@ -3,8 +3,12 @@
 Research date: 2026-10-20. This traces the original FPREM entry and its shared
 hardware divider. It distinguishes documented behavior, consequences of the
 recovered control flow, and a candidate integer reconstruction. It is not a
-physical 8087 capture. The partial reduction count and quotient initialization
-are not sufficiently decoded to remove the partial-remainder guard.
+physical 8087 capture. The [divider-control follow-up](FPREM_DIVIDER_CONTROLS.md)
+establishes the 63-place reduction cap through an independent normalization
+path. The implementation follows that source-derived count and Intel's
+completed-history rule. Short unnormal partial history and tiny-result
+completion still retain guards; the sections below record the raw controls
+and distinguish those remaining limits.
 
 ## Sources and scope
 
@@ -86,7 +90,7 @@ route. Thus a chosen long reduction can leave C2 set even when its result
 becomes zero or smaller than the original divisor. This is a consequence of
 the recovered control flow, pending physical validation.
 
-## Divider invocation and the count still to resolve
+## Divider invocation and count derivation
 
 `#1624` supplies tmpA fraction to the signed sum register, `#1625` supplies
 tmpB fraction to the B register, and `#1626` selects mode with raw `6b48`.
@@ -97,24 +101,27 @@ sequence, followed by raw `5244` at
 `#1631`. These last controls are not a fully decoded executable nanomachine
 specification in the public notes.
 
-The leading candidate is `k = min(D, 63)`, followed by k-plus-one binary
+The functional reconstruction is `k = min(D, 63)`, followed by k-plus-one binary
 quotient trials, with the first leading zero trial treated specially. That
 would make the capped case a reduction using up to 64 quotient bits. It fits
 the loop-counter construction and the original manual's upper bound. It is
 not proved solely by those observations.
 
-The exact unresolved points are:
+The raw decode has these limits, separated from the functional reconstruction:
 
 - **`1f00` count source.** Source `1f` supplies all ones on the exponent bus
   and `c000000000000000` on the fraction bus when forming real indefinite.
-  Its connection to the six-bit count load must be followed before calling
-  this an established constant 63. Reading the low six fraction bits instead
-  would give zero. The disassembler's register names do not settle the bus
-  selector.
+  The disassembler's register names do not settle its physical bus selector.
+  The follow-up resolves the functional count through `#1326`/`#1327`, which
+  pairs the same count source with an explicit 63-place normalization shift.
+  Reading low fraction bits and choosing zero contradicts that independent
+  use. This establishes the count without claiming an electrical bus-tap decode.
 - **Initial trial and loop termination.** The behavior of `52c0`, `f40c`,
   `524b` and `5244` in mode `6b48`, including final non-restoring correction, is needed
-  to prove the number of generated quotient bits. Inferring it from another
-  processor's remainder loop would be circular.
+  to reproduce the individual internal transitions. The original patent's
+  same-exponent modulus example and the raw exponent/count relationship
+  support the exact integer reconstruction independently of later processors.
+  Those controls remain relevant to cycle timing and hidden partial history.
 - **Unnormal divisor rejection.** Intel explicitly requires invalid
   operation, but there is no visible direct tmpB integer-bit branch. The
   complete entry anomaly predicate `23`, divider initialization and other
@@ -190,8 +197,9 @@ last completed step reports the low bits of the full mathematical quotient.
 
 ## Candidate integer reconstruction
 
-Once k and quotient-history controls are established, an exact finite
-reconstruction can use a wide unsigned remainder and avoid floating point:
+The follow-up establishes k and applies Intel Table 4b to completed history.
+An exact finite reconstruction can use a wide unsigned remainder and avoid
+floating point:
 
 ```text
 If D < 0:

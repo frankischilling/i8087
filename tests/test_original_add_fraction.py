@@ -28,7 +28,9 @@ def expected(a, b, modrm, precision, rc):
         av = -av
     total = av + bv
     if not total:
-        return None
+        larger_fraction = a[1] if ae >= be else b[1]
+        zero_exponent = 0 if larger_fraction >= J else exponent
+        return (zero_exponent | (0x8000 if rc == 1 else 0), 0), False, None
     magnitude = abs(total)
     if (av < 0) == (bv < 0):
         if magnitude >= 2 * J:
@@ -60,8 +62,9 @@ def main():
     rng = random.Random(0x8087ADD)
     inputs, expectations = [], []
     while len(inputs) < 30000:
-        distance = rng.choice((0, 0, 1, 1, 2, 3, 31, 62, 63, rng.randrange(64)))
-        larger = rng.choice((0x0041 + distance, 0x4000, 0x7FFD))
+        distance = rng.choice((0, 0, 1, 1, 2, 3, 31, 62, 63, 64, 65, 66, 127,
+                               32700, rng.randrange(32701)))
+        larger = rng.choice((0x0041 + distance, max(0x0041 + distance, 0x4000), 0x7FFD))
         ae, be = larger, larger - distance
         if rng.randrange(2):
             ae, be = be, ae
@@ -75,8 +78,6 @@ def main():
         precision, pc = rng.choice(((24, 0), (53, 2), (64, 3)))
         rc, modrm = rng.randrange(4), rng.choice((0xC1, 0xE1, 0xE9))
         prediction = expected(a, b, modrm, precision, rc)
-        if prediction is None:
-            continue
         result, inexact, increment = prediction
         masked = rng.randrange(2)
         control = 0x1000 | pc << 8 | rc << 10 | (0x3F if masked else 0)
@@ -87,31 +88,25 @@ def main():
         sentinels = tuple((0x4002, J + i) for i in range(6))
         inputs.append(vector(0xD8, modrm, a, b, control, initial_status, other=sentinels))
         interrupt = inexact and not masked
+        c1 = initial_status & 0x200 if increment is None else (0x200 if increment else 0)
         status = ((initial_status & ~0x200) | (0x20 if inexact else 0) |
-                  (0x200 if increment else 0) | (0x8080 if interrupt else 0))
+                  c1 | (0x8080 if interrupt else 0))
         expectations.append((1 if interrupt else 0, 0, status, (result, b) + sentinels, 0))
     random_count = len(inputs)
     campaign, labels = make_cases("finite-add")
     assert len(campaign) == len(labels) == 46080
-    blocked = 0
     for query in campaign:
         control, initial_status, tags = struct.unpack_from("<HHH", query, 2)
         registers = tuple((e, s) for s, e in struct.iter_unpack("<QH", query[16:]))
         a, b = registers[:2]
         precision = (24, None, 53, 64)[(control >> 8) & 3]
         rc = (control >> 10) & 3
-        distance = abs((a[0] & 0x7FFF) - (b[0] & 0x7FFF))
-        prediction = None if distance >= 64 else expected(a, b, query[1], precision, rc)
+        prediction = expected(a, b, query[1], precision, rc)
         inputs.append(query)
-        if prediction is None:
-            blocked += 1
-            expectations.append((2, 2, initial_status, registers, tags))
-        else:
-            result, inexact, increment = prediction
-            status = ((initial_status & ~0x200) | (0x20 if inexact else 0) |
-                      (0x200 if increment else 0))
-            expectations.append((0, 0, status, (result,) + registers[1:], tags))
-    assert blocked == 20736
+        result, inexact, increment = prediction
+        c1 = initial_status & 0x200 if increment is None else (0x200 if increment else 0)
+        status = (initial_status & ~0x200) | (0x20 if inexact else 0) | c1
+        expectations.append((0, 0, status, (result,) + registers[1:], tags))
     with tempfile.TemporaryDirectory() as directory:
         source, destination = Path(directory) / "input.bin", Path(directory) / "model.bin"
         write_trace(source, INPUT_MAGIC, inputs)
@@ -128,7 +123,7 @@ def main():
                                      f"got {(result, gaps, status, registers, tags)}\nwant {want}")
             assert control == initial_control, (index, control, initial_control)
     print(f"PASS: {random_count} Fraction raw-add/subtract cases; "
-          f"{len(campaign)} campaign inputs ({blocked} guarded); no hardware evidence")
+          f"{len(campaign)} campaign inputs (all source-derived); no hardware evidence")
 
 
 if __name__ == "__main__":

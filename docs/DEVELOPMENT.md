@@ -9,7 +9,7 @@ are met. Physical hardware access is not required; use original documentation,
 first-hand research and independent software references. Published captures
 are optional corroboration.
 
-CI runs all eight suites with GCC on Linux, Clang with AddressSanitizer
+CI runs all ten suites with GCC on Linux, Clang with AddressSanitizer
 and UndefinedBehaviorSanitizer on Linux, and MSVC on Windows. Compiler warnings
 are errors. The GCC job checks the supported Python minimum; the other jobs use
 a current interpreter. CI verifies test discovery so a missing interpreter

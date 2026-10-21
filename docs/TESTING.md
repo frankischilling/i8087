@@ -291,29 +291,39 @@ subtract, the decoded normalization gate, half-bit promotion and raw PC
 rounding. Canonical backend operations retain their independent mathematical
 tests. Integration currently requires properly tagged nonzero finite inputs
 with stored E from `0041` through `7ffd`, or a canonical zero, and at least
-one unnormal. Fresh DE, reserved PC, nonzero alignment counts of at least 64,
-exact-cancellation C1 and unnormal range completion remain guarded.
+one unnormal. Exact cancellation and canonical both-zero early returns also
+accept the full finite exponent range, including normal cancellation. These
+paths preserve C1, independently of zero sign and tag. Fresh DE, reserved PC
+and unnormal range completion remain guarded. Intel's original GRS definition
+supplies the tail
+for all alignment distances, including the 64/65 boundaries and sticky-only
+counts from 66 onward.
 
-The `original_add_datapath` suite crosses 22 literal cases through 709,632
+The `original_add_datapath` suite crosses 47 literal cases through 1,516,032
 register executions, with all nine operation/destination/pop forms, indices,
 TOP, both operand orders, signs, masks, sticky flags, initial C1 and policies.
-Another 4,608 executions check short/long real and integer nonzero memory
+Another 6,912 executions check short/long real and integer nonzero memory
 operands. Private-path controls check half-bit promotion, range rejection and
-the predicted cancellation payload without declaring C1 known. The new first
-acceptance check fails when linked to the earlier instruction core.
+the cancellation payload and C1-preserve action. The matrix includes exponent
+edges, same-E cancellation and equal numeric values with different stored E.
+A further 9,216 both-zero executions cover effective signs and early returns.
+The first acceptance check fails when linked to the earlier instruction core.
+A separate normal-cancellation check reproduces C1 clearing in that core and
+passes with the source-derived preservation rule.
 
 The `original_add_fraction_oracle` suite checks 30,000 seeded inputs by choosing
 the source-prescribed alignment and rounding exact signed Python Fractions.
 It uses no C bit-operation implementation or host floating point to calculate
 the result. It also replays all 46,080 finite-add capture inputs, checking
-25,344 supported raw outcomes and preserving the state of 20,736 guarded rows.
+46,080 supported raw outcomes, including all 6,912 exact-cancellation inputs.
 These expectations exercise the reconstruction; they do not independently
-prove the physical chip follows it. CI requires both new suites alongside the
-six existing suites.
+prove the physical chip follows it. CI requires both finite-add suites along
+with the remainder suites and the six existing suites.
 
 [The source investigation](research/FINITE_ADD_SUBTRACT.md) distinguishes
-resolved arithmetic branches from missing large-count GRS and cancellation
-condition writes. No original-hardware output has been supplied for this work.
+resolved arithmetic branches from remaining range completion. The
+random cases include distances through 32,700. No original-hardware output has
+been supplied for this work.
 
 The FPREM regression adds 98,304 cases with stored exponent differences of
 64, 65 and 66 but numerically small unnormal dividends. The previous core
@@ -322,9 +332,49 @@ check fails against that behavior. Strict mode preserves all state and
 reports the unresolved partial path. Opt-in fallback remains labeled and
 sets C2 even when its value is zero. PC/RC, TOP, old quotient flags, both
 signs, old C2 and sticky flags are crossed. This verifies the decoded outer
-selection, not the still-unresolved divider count or partial quotient bits.
+selection and the remaining short partial-history guard. The numerical
+fallback now uses the original reduction count; those cases still cannot
+establish C0/C1/C3 in strict mode.
 
-All eight suites pass locally with GCC and MSVC on Windows and Clang with
-ASan/UBSan under Linux for the finite-add implementation. Hosted checks are
-required on the final pull request head. Physical hardware is optional
-corroboration and is not a prerequisite for completing source-backed work.
+## Original remainder datapath
+
+The separate C subsystem computes `divmod(S_A * 2^k, S_B)` with
+`k = min(stored exponent distance, 63)` for a nonnegative distance. It uses a
+64-bit remainder and a separate carry for each shift, without host floating
+point or a compiler-specific wide integer. A negative distance bypasses division
+and normalizes the dividend. The result keeps the dividend sign and C2 follows
+the stored long-count branch even if the fraction becomes zero. PC and RC do
+not shorten the remainder. Tiny-result completion retains its range guard.
+
+The `original_remainder_datapath` suite crosses 14 literal cases through
+917,504 executions: both signs, all PC/RC fields, TOP, old quotient history,
+old C2, sticky flags, masks and both policies. It checks every raw register,
+tags, full status/control, saved instruction and opcode, interrupt state and
+guard reporting. Another 4,096 sequences perform five successive reductions
+through completion, checking 20,480 intermediate states. A tiny-result control
+checks range rejection and rollback. The first acceptance test fails against
+the earlier instruction core, which guarded every normal partial reduction.
+
+The `original_remainder_integer_oracle` suite checks 30,000 seeded cases and
+128 complete sequences, totaling 48,869 input states. Python integer `divmod`
+and `bit_length` determine each result independently of the C serial divider.
+Exact Fractions separately check the final mathematical remainder. Every
+state is replayed with strict and opt-in policies, including 6,434 short
+partial-history guards. The test checks raw payloads, tags, every status bit,
+control and unchanged sentinel registers. Long sequences cover stored
+distances through 32,700 and assert at least a 63-place reduction for each
+nonzero partial result.
+
+Completed quotient history follows Intel Table 4b, including unnormal dividends
+whose stored distance exceeds their numerical quotient length. A partial
+quotient with at least three significant bits replaces the old history.
+For fewer bits, strict mode preserves state and reports the remaining gap;
+opt-in mode preserves the old C0/C1/C3 while delivering the original numerical
+remainder and C2. That partial-history choice is explicitly unverified. See
+[the divider-control derivation](research/FPREM_DIVIDER_CONTROLS.md).
+
+All ten suites passed locally with GCC and MSVC on Windows and Clang with
+ASan/UBSan under Linux. The direct C demo, formatting check and diff check also
+passed. CI requires all ten suites. Hosted checks must pass on the final pull request
+head. Physical hardware is optional corroboration and is not a prerequisite
+for completing source-backed work.

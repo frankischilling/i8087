@@ -98,15 +98,27 @@ The [finite addition/subtraction reconstruction](research/FINITE_ADD_SUBTRACT.md
 follows J2's stored-exponent ordering, separate fraction/GRS operations,
 normalization gate, half-bit promotion and J11 carry. It distinguishes the
 retained right-shift result from the later tail calculation. The original
-shifter patent supplies the read/load interface distinction. Large-count
-rounding selection, exact-cancellation C1 and unnormal range completion remain
-open rather than being filled in from canonical arithmetic.
+shifter patent supplies the read/load interface distinction. Intel's processor
+patent defines the GRS placement for all shifted-out bits, supporting large
+alignment counts. The [C1 writer audit](research/CANCELLATION_C1.md) supports
+preserving C1 on exact cancellation and both-zero early returns, independently
+of result sign and tag. Unnormal range completion remains open rather than
+being filled in from canonical arithmetic.
 
 The [partial remainder reconstruction](research/PARTIAL_FPREM.md) follows
 FPREM's stored-exponent selection, C2, divider invocation and result tail.
-The long path remains selected even if a normalized fallback returns zero.
-The reduction count and quotient initialization are still incomplete; the
-current 32-trial fallback is not treated as the recovered original algorithm.
+The [divider-control follow-up](research/FPREM_DIVIDER_CONTROLS.md) establishes
+the 63-place cap through a separate normalization path using the same raw
+count source. Exact integer division supplies each normalized intermediate
+remainder, and Intel Table 4b supplies completed quotient history. Partial
+history with fewer than three significant quotient bits remains guarded.
+Tiny-result range completion is separate from this finite reconstruction.
+
+The [finite multiplication/division investigation](research/FINITE_MULTIPLY_DIVIDE.md)
+records J1/J3 exponent formulas, raw rounding and a conflict between the
+provisional top-bit condition and Intel's broad unnormal-result rule. These
+paths remain guarded for unnormal operands; this research is not yet an
+implementation of those operations.
 
 Table A-2, printed S-112 through S-114, explicitly assigns operations to nine
 register encoding groups that Intel's translators do not emit. The decoder

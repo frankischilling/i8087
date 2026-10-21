@@ -68,9 +68,10 @@ accuracy. The FRNDINT campaign includes every raw PC field value; reserved
 field probes do not establish documented behavior for that setting.
 
 The finite-add campaign includes stored exponent differences of 63, 64, 65 and
-66 and seeds both C1 states. Its 20,736 currently guarded inputs include large
-alignment and exact cancellation. Preserve their physical results if obtained;
-a model rejection is not a passing comparison. The combined campaign remains
+66 and seeds both C1 states. All 46,080 inputs now have source-derived model
+expectations, including C1 preservation on cancellation. Preserve physical
+results for any inputs if obtained; a model match is not a physical comparison.
+The combined campaign remains
 within the DOS collector's 65,535-record limit.
 
 `tools/hardware/CAPTURE.COM` is supplied together with its assembly source. The

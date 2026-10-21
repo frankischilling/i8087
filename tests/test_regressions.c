@@ -162,8 +162,9 @@ static void remainder_flags(void) {
         i8087_init(&f);
         number(&f, 0, (i8087_f80){JBIT, 0x4100});
         number(&f, 1, integer(3));
-        CHECK(op(&f, 0xd9, 0xf8) == I8087_UNVERIFIED);
-        CHECK(f.last_gap & I8087_GAP_PARTIAL_REMAINDER);
+        ok(&f, 0xd9, 0xf8);
+        CHECK(eq(st(&f, 0), (i8087_f80){JBIT, 0x40c0}));
+        CHECK((f.status & CC) == (I8087_C2 | cc_from_q(5)));
     }
     {
         i8087 f;
