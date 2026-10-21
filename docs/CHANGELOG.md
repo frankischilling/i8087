@@ -7,6 +7,9 @@
 - Preserve bounded PC64 unnormal-plus-zero add/subtract results without
   normalizing their stored exponent and significand. Keep other unnormal
   cases guarded and provide discriminating capture inputs.
+- Extend that bounded path to PC24/53 using the stored significand alignment.
+  Preserve exponent and VALID tag through rounding to a pseudozero or into the
+  integer bit, with PE/C1 and unmasked precision continuation tests.
 - Add GCC/Linux, Clang ASan/UBSan and MSVC/Windows CI, with required checks on
   `main`. Fix MSVC build diagnostics while retaining portable C stdio.
 - Preserve replay inputs and captures through exclusive output creation;

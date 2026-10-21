@@ -86,8 +86,13 @@ significand footnote is retained in the research record.
 
 The [unnormal-plus-zero investigation](research/UNNORMAL_ZERO_ARITHMETIC.md)
 combines Intel's normalization rule with the decoded alignment and precision
-paths. It supports a bounded PC64 result that retains the unnormal exponent
-and significand; it does not establish general unnormal arithmetic.
+paths. Its PC64 result retains the unnormal exponent and significand.
+[Reduced precision](research/UNNORMAL_REDUCED_PRECISION.md) follows the fixed
+J11 shortening, discarded-bit rounding, exponent and tag writes. Intel patent
+[US4338675A](https://patents.google.com/patent/US4338675A/en), rounding section E,
+connects precision reporting to the discarded bits. These sources support the
+bounded PC24/53 path, including pseudozero output; they do not establish
+general unnormal arithmetic or agreement with a physical chip.
 
 Table A-2, printed S-112 through S-114, explicitly assigns operations to nine
 register encoding groups that Intel's translators do not emit. The decoder

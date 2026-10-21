@@ -48,8 +48,8 @@ Select a campaign with `--suite`:
 | `overflow` | 96 | Masked arithmetic overflow across signs and control modes; 24 CHOP rows remain guarded |
 | `constants` | 2,688 | All seven loads, documented PC fields, RC, TOP, empty/full stacks and clear/set sticky PE |
 | `encodings` | 72 | The nine alternate register groups in Intel Table A-2 |
-| `unnormal-zero` | 3,072 | Bounded PC64 add/subtract, signs, operand order, RC and TOP |
-| `all` | 6,772 | Combined campaigns |
+| `unnormal-zero` | 15,360 | Bounded PC24/53/64 add/subtract, ties, carry, pseudozero output, signs, operand order, RC and TOP |
+| `all` | 19,060 | Combined campaigns |
 
 The constant campaign preserves known raw bytes in every register and records
 which inputs have occupied stacks. Its model-only check has 384 supported

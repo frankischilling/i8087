@@ -118,8 +118,19 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
                 add(f"Intel Table A-2 {esc:02x} {base+i:02x} {name} ST({i})", esc, base+i,
                     integer(1), integer(2), other=tuple(integer(k) for k in range(3, 9)))
     if suite in ("unnormal-zero", "all"):
-        payloads = ((0x4000, J >> 1), (0x4000, 1), (0x0041, 1), (0x7FFD, (J >> 1) + 1))
-        for exponent, significand in payloads:
+        payloads = [(0x4000, J >> 1, 3), (0x4000, 1, 3),
+                    (0x0041, 1, 3), (0x7FFD, (J >> 1) + 1, 3)]
+        for pc, fractions in (
+                (0, (0x4000010000000000, 0x4000007FFFFFFFFF, 0x4000008000000000,
+                     0x4000018000000000, 0x4000008000000001, 0x7FFFFF8000000000,
+                     0x0000008000000000, 0x0000008000000001)),
+                (2, (0x4000000000000800, 0x40000000000003FF, 0x4000000000000400,
+                     0x4000000000000C00, 0x4000000000000401, 0x7FFFFFFFFFFFFC00,
+                     0x0000000000000400, 0x0000000000000401))):
+            for index, fraction in enumerate(fractions):
+                exponent = 0x0041 if index == 0 else 0x7FFD if index == 5 else 0x4000
+                payloads.append((exponent, fraction, pc))
+        for exponent, significand, pc in payloads:
             for sign in range(2):
                 for zero_sign in range(2):
                     for which in range(2):
@@ -128,8 +139,8 @@ def make_cases(suite: str) -> tuple[list[bytes], list[dict]]:
                         for name, opcode in (("FADD", 0xC1), ("FSUB", 0xE1), ("FSUBR", 0xE9)):
                             for rc in range(4):
                                 for top in range(8):
-                                    add(f"{name} unnormal+zero raw={x} side={which} zeroSign={zero_sign} rc={rc} top={top}",
-                                        0xD8, opcode, a, b, cw=0x03BF | rc << 10,
+                                    add(f"{name} unnormal+zero raw={x} side={which} zeroSign={zero_sign} pc={pc} rc={rc} top={top}",
+                                        0xD8, opcode, a, b, cw=0xBF | pc << 8 | rc << 10,
                                         sw=top << 11 | 0x4700)
     return records, names
 

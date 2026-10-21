@@ -134,14 +134,14 @@ flags and condition-code patterns separately.
 Expected bytes copy the unnormal exponent/significand with the sign rule above.
 For example, `4000:4000000000000000` plus +0 must remain that raw value;
 `3fff:8000000000000000` would expose an unwanted normalization. Add negative
-tests confirming that reduced PC, pseudozeros, denormals and excluded exponent
+tests confirming that reserved PC, pseudozeros, denormals and excluded exponent
 edges remain guarded. Treat these as document/die-derived expectations until
 an identified original chip supplies independent captures.
 
 ## Implemented scope and tests
 
 The instruction layer checks both tags, canonical zero bits, nonzero unnormal
-significand, PC64 and the stated exponent interval before applying this result.
+significand, documented PC and the stated exponent interval before applying this result.
 A new denormal-operand event excludes the path, preserving the separate memory
 load response. Subtraction sign adjustment and reverse-operand selection occur
 before the bounded result is accepted. Ordinary destination, pop and exception
@@ -151,4 +151,7 @@ The backend's canonical arithmetic remains unchanged. Its normalization is
 useful for the independent mathematical oracle but cannot represent the raw
 unnormal result here. [Regression scope](../TESTING.md#bounded-unnormal-plus-zero-arithmetic)
 and the `unnormal-zero` input campaign distinguish that boundary. The capture
-generator implements the 3,072-case matrix above; its checks are model-only.
+generator implements the 3,072-case PC64 matrix above. The
+[reduced-precision extension](UNNORMAL_REDUCED_PRECISION.md) adds PC24/53 raw-grid
+rounding, carry and pseudozero-output cases; the combined campaign has 15,360
+inputs. Its checks are model-only.
